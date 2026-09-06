@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vår Handleliste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap">
+</head>
+<body>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+(function () {
+  'use strict';
+
+  /* ============================== styling ============================== */
+
+  var CSS = [
+    ':root{',
+    '  --bg:#F4F7F0;',
+    '  --surface:#FFFFFF;',
+    '  --surface-2:#EAF0E4;',
+    '  --ink:#1F2A1E;',
+    '  --ink-soft:#4C5745;',
+    '  --muted:#818C78;',
+    '  --line:#DFE7D6;',
+    '  --accent:#2E6B3C;',
+    '  --accent-strong:#204E2B;',
+    '  --accent-ink:#FBFFF7;',
+    '  --accent-soft:#E2EFDD;',
+    '  --warn:#C4531F;',
+    '  --warn-soft:#F7E4D6;',
+    '  --shadow:0 1px 2px rgba(24,32,20,0.06), 0 10px 28px -16px rgba(24,32,20,0.28);',
+    '  --radius-lg:20px;',
+    '  --radius-md:14px;',
+    '  --radius-sm:10px;',
+    '  color-scheme:light;',
+    '}',
+    '@media (prefers-color-scheme: dark){',
+    '  :root:not([data-theme="light"]){',
+    '    --bg:#121A13;',
+    '    --surface:#1B251B;',
+    '    --surface-2:#223221;',
+    '    --ink:#EDF3E7;',
+    '    --ink-soft:#C3D0BC;',
+    '    --muted:#8FA085;',
+    '    --line:#2B3A29;',
+    '    --accent:#6BC97E;',
+    '    --accent-strong:#8CDB9B;',
+    '    --accent-ink:#0E1A0F;',
+    '    --accent-soft:#213C26;',
+    '    --warn:#F0906A;',
+    '    --warn-soft:#3B2A21;',
+    '    --shadow:0 1px 2px rgba(0,0,0,0.35), 0 12px 30px -16px rgba(0,0,0,0.6);',
+    '    color-scheme:dark;',
+    '  }',
+    '}',
+    ':root[data-theme="dark"]{',
+    '  --bg:#121A13; --surface:#1B251B; --surface-2:#223221; --ink:#EDF3E7; --ink-soft:#C3D0BC;',
+    '  --muted:#8FA085; --line:#2B3A29; --accent:#6BC97E; --accent-strong:#8CDB9B; --accent-ink:#0E1A0F;',
+    '  --accent-soft:#213C26; --warn:#F0906A; --warn-soft:#3B2A21;',
+    '  --shadow:0 1px 2px rgba(0,0,0,0.35), 0 12px 30px -16px rgba(0,0,0,0.6);',
+    '  color-scheme:dark;',
+    '}',
+    '*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}',
+    'html,body{margin:0;padding:0;}',
+    'body{',
+    '  background:var(--bg); color:var(--ink); min-height:100vh;',
+    '  font-family:"Work Sans", system-ui, -apple-system, sans-serif;',
+    '  -webkit-font-smoothing:antialiased;',
+    '  padding-bottom:calc(28px + env(safe-area-inset-bottom));',
+    '}',
+    '#root{max-width:560px;margin:0 auto;padding:0 16px;}',
+    'h1,h2,h3{font-family:"Fredoka",system-ui,sans-serif;margin:0;font-weight:600;text-wrap:balance;}',
+    'header.app-header{',
+    '  padding:calc(20px + env(safe-area-inset-top)) 0 14px;',
+    '  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;',
+    '}',
+    '.brand{display:flex; align-items:center; gap:10px;}',
+    '.brand-mark{',
+    '  width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--accent-ink);',
+    '  display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:var(--shadow);',
+    '}',
+    '.brand h1{font-size:22px;color:var(--ink);line-height:1.1;}',
+    '.brand p{margin:2px 0 0;font-size:13px;color:var(--muted);}',
+    '.who{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);',
+    '  background:var(--surface);border:1px solid var(--line);padding:6px 10px 6px 8px;border-radius:999px;',
+    '  box-shadow:var(--shadow); white-space:nowrap;',
+    '}',
+    '.who button{border:none;background:none;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:0;}',
+    '.avatar{width:20px;height:20px;border-radius:50%;background:var(--accent-soft);color:var(--accent-strong);',
+    '  display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;}',
+    '.status-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0 0 14px;min-height:16px;}',
+    '.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;}',
+    '.status-row[data-state="saved"] .status-dot{background:var(--accent);}',
+    '.status-row[data-state="saving"] .status-dot{background:#D8A23A;animation:pulse 1s ease-in-out infinite;}',
+    '.status-row[data-state="error"] .status-dot{background:var(--warn);}',
+    '@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}',
+    '.list-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px;margin:0 -2px 14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}',
+    '.list-tabs::-webkit-scrollbar{display:none;}',
+    '.tab{',
+    '  display:flex; align-items:center; gap:4px; flex-shrink:0; border-radius:999px; border:1px solid var(--line);',
+    '  background:var(--surface); color:var(--ink-soft); font:inherit; font-size:13.5px; font-weight:500;',
+    '  white-space:nowrap; box-shadow:var(--shadow);',
+    '}',
+    'button.tab{padding:9px 16px;cursor:pointer;}',
+    'div.tab{padding:6px 6px 6px 16px;}',
+    '.tab.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;}',
+    '.tab-name{padding:3px 0;}',
+    '.tab-icon-btn{',
+    '  border:none;background:rgba(0,0,0,0.08);color:inherit;width:24px;height:24px;border-radius:50%;',
+    '  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0;',
+    '}',
+    '.tab.active .tab-icon-btn{background:rgba(255,255,255,0.24);}',
+    '.tab-icon-btn svg{width:11px;height:11px;}',
+    '.tab-add{border-style:dashed;color:var(--muted);background:transparent;}',
+    'form.add-form{',
+    '  display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line); padding:10px;',
+    '  border-radius:var(--radius-lg); box-shadow:var(--shadow); margin-bottom:18px;',
+    '}',
+    'form.add-form .fields{display:flex;flex:1;align-items:center;gap:8px;min-width:0;}',
+    '.add-form input{',
+    '  border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:var(--radius-sm);',
+    '  padding:11px 12px; font-size:15px; font-family:inherit; min-width:0; flex:1 1 auto;',
+    '}',
+    '.add-form input::placeholder{color:var(--muted);}',
+    '.add-form input:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+    '.add-btn{',
+    '  border:none; background:var(--accent); color:var(--accent-ink); border-radius:var(--radius-sm);',
+    '  width:44px; height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; cursor:pointer;',
+    '}',
+    '.add-btn:active{background:var(--accent-strong);}',
+    '.qty-stepper{',
+    '  display:flex; align-items:center; flex:0 0 auto; border:1px solid var(--line); border-radius:999px;',
+    '  background:var(--surface-2); overflow:hidden;',
+    '}',
+    '.qty-stepper button{',
+    '  border:none; background:transparent; color:var(--ink-soft); display:flex; align-items:center; justify-content:center;',
+    '  cursor:pointer; padding:0;',
+    '}',
+    '.qty-stepper button:active:not(:disabled){background:var(--accent-soft);color:var(--accent-strong);}',
+    '.qty-stepper button:disabled{opacity:.35;cursor:not-allowed;}',
+    '.qty-stepper .qty-value{font-variant-numeric:tabular-nums;text-align:center;color:var(--ink);}',
+    '.qty-stepper:not(.sm) button{width:34px;height:34px;}',
+    '.qty-stepper:not(.sm) .qty-value{min-width:22px;font-size:14.5px;}',
+    '.qty-stepper.sm button{width:28px;height:28px;}',
+    '.qty-stepper.sm .qty-value{min-width:18px;font-size:13.5px;}',
+    'section.list-section{display:flex;flex-direction:column;gap:8px;}',
+    '.group-label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 2px 2px;}',
+    '.group-label:first-child{margin-top:0;}',
+    'ul.item-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}',
+    'li.item{',
+    '  display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line);',
+    '  border-radius:var(--radius-md); padding:10px 10px 10px 12px; box-shadow:var(--shadow);',
+    '}',
+    'li.item.is-checked{background:transparent; box-shadow:none; border-style:dashed;}',
+    '.check-btn{',
+    '  width:26px;height:26px;border-radius:8px;border:2px solid var(--line);background:var(--surface-2);',
+    '  flex-shrink:0; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;',
+    '}',
+    '.check-btn svg{width:15px;height:15px;opacity:0;transform:scale(.6);transition:opacity .12s,transform .12s;}',
+    'li.item.is-checked .check-btn{background:var(--accent);border-color:var(--accent);}',
+    'li.item.is-checked .check-btn svg{opacity:1;transform:scale(1);stroke:var(--accent-ink);}',
+    '.item-body{flex:1;min-width:0;}',
+    '.item-name{display:block;font-size:15.5px;color:var(--ink);word-break:break-word;}',
+    'li.item.is-checked .item-name{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--muted);}',
+    '.item-qty.static{',
+    '  font-size:12.5px;color:var(--muted);background:var(--surface-2);padding:5px 10px;flex-shrink:0;',
+    '  border-radius:999px;font-variant-numeric:tabular-nums;',
+    '}',
+    '.item-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}',
+    '.del-btn{',
+    '  border:none;background:none;color:var(--muted);cursor:pointer;padding:6px;flex-shrink:0;',
+    '  display:flex;align-items:center;justify-content:center;border-radius:8px;',
+    '}',
+    '.del-btn:active{background:var(--warn-soft);color:var(--warn);}',
+    '.empty-state{',
+    '  text-align:center; padding:40px 20px; color:var(--muted); background:var(--surface);',
+    '  border:1px dashed var(--line); border-radius:var(--radius-lg);',
+    '}',
+    '.empty-state h3{color:var(--ink-soft); font-size:16px; margin-bottom:4px;}',
+    '.footer-row{display:flex; justify-content:center; margin-top:18px;}',
+    '.clear-btn{',
+    '  border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); font:inherit; font-size:13px;',
+    '  padding:9px 16px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow);',
+    '}',
+    '.hint{text-align:center;font-size:11.5px;color:var(--muted);margin:22px 0 4px;line-height:1.5;}',
+    '.overlay{',
+    '  position:fixed; inset:0; background:rgba(18,24,16,.55); display:flex; align-items:center; justify-content:center;',
+    '  padding:20px; z-index:20;',
+    '}',
+    '.modal{',
+    '  background:var(--surface); border-radius:var(--radius-lg); padding:22px; width:100%; max-width:340px;',
+    '  box-shadow:var(--shadow); text-align:center;',
+    '}',
+    '.modal h2{font-size:19px;margin-bottom:6px;}',
+    '.modal p{font-size:13.5px;color:var(--muted);margin:0 0 16px;line-height:1.5;}',
+    '.modal input{',
+    '  width:100%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:var(--radius-sm);',
+    '  padding:12px; font-size:16px; font-family:inherit; text-align:center; margin-bottom:12px;',
+    '}',
+    '.modal input:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+    '.modal button.primary{',
+    '  width:100%; border:none; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:600;',
+    '  font-size:15px; padding:12px; border-radius:var(--radius-sm); cursor:pointer;',
+    '}',
+    '.modal button.primary.danger{background:var(--warn);}',
+    '.modal button.primary:disabled{opacity:.6;cursor:default;}',
+    '.modal-actions{display:flex;gap:10px;}',
+    '.modal-actions button{flex:1;}',
+    '.modal button.secondary{',
+    '  border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); font:inherit; font-weight:600;',
+    '  font-size:15px; padding:12px; border-radius:var(--radius-sm); cursor:pointer;',
+    '}',
+    '.view-switch{display:flex;gap:8px;margin-bottom:16px;}',
+    '.view-switch button{',
+    '  flex:1; padding:10px; border-radius:12px; border:1px solid var(--line); background:var(--surface);',
+    '  color:var(--ink-soft); font:inherit; font-weight:600; font-size:13.5px; cursor:pointer; box-shadow:var(--shadow);',
+    '}',
+    '.view-switch button.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}',
+    '.recipe-list{display:flex;flex-direction:column;gap:10px;}',
+    '.recipe-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow);}',
+    '.recipe-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;}',
+    '.recipe-card h3{font-size:16px;word-break:break-word;}',
+    '.recipe-card-actions{display:flex;gap:4px;flex-shrink:0;}',
+    '.recipe-ing-preview{font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 12px;}',
+    '.recipe-add-btn{',
+    '  width:100%; border:none; background:var(--accent-soft); color:var(--accent-strong); font:inherit; font-weight:600;',
+    '  font-size:13.5px; padding:10px; border-radius:var(--radius-sm); cursor:pointer;',
+    '}',
+    '.recipe-add-btn:active{background:var(--accent);color:var(--accent-ink);}',
+    '.add-recipe-btn{',
+    '  width:100%; border:1px dashed var(--line); background:transparent; color:var(--muted); font:inherit; font-weight:600;',
+    '  font-size:14px; padding:12px; border-radius:var(--radius-lg); cursor:pointer; margin-bottom:14px;',
+    '}',
+    '.modal.wide{max-width:420px;text-align:left;}',
+    '.modal.wide h2{text-align:center;}',
+    '.recipe-name-input{',
+    '  width:100%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:var(--radius-sm);',
+    '  padding:11px 12px; font-size:15px; font-family:inherit; margin-bottom:14px;',
+    '}',
+    '.recipe-name-input:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+    '.ingredient-rows{display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto;margin-bottom:10px;padding-right:2px;}',
+    '.ingredient-row{display:flex;align-items:center;gap:6px;}',
+    '.ingredient-row input[type="text"]{',
+    '  flex:1; min-width:0; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:var(--radius-sm);',
+    '  padding:9px 10px; font-size:14px; font-family:inherit;',
+    '}',
+    '.ingredient-row input[type="text"]:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+    '.ingredient-remove{',
+    '  border:none;background:none;color:var(--muted);cursor:pointer;padding:6px;flex-shrink:0;',
+    '  display:flex;align-items:center;justify-content:center;border-radius:8px;',
+    '}',
+    '.ingredient-remove:active{background:var(--warn-soft);color:var(--warn);}',
+    '.add-ingredient-btn{',
+    '  width:100%; border:1px dashed var(--line); background:transparent; color:var(--ink-soft); font:inherit; font-size:13.5px;',
+    '  padding:9px; border-radius:var(--radius-sm); cursor:pointer; margin-bottom:14px;',
+    '}',
+    '.setup-screen{max-width:440px;margin:32px auto 0;padding:0 4px;}',
+    '.setup-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:22px;box-shadow:var(--shadow);}',
+    '.setup-card .brand{margin-bottom:16px;}',
+    '.setup-card h2{font-size:18px;margin:0 0 8px;}',
+    '.setup-card p{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0 0 14px;}',
+    '.config-textarea{',
+    '  width:100%; min-height:130px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink);',
+    '  border-radius:var(--radius-sm); padding:11px 12px; font-size:12.5px; line-height:1.5;',
+    '  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; margin-bottom:12px; resize:vertical;',
+    '}',
+    '.config-textarea:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+    '.field-error{color:var(--warn);font-size:13px;margin:-4px 0 14px;line-height:1.5;}',
+    '.link-btn{border:none;background:none;color:var(--accent);font:inherit;font-size:11.5px;cursor:pointer;padding:0;text-decoration:underline;white-space:nowrap;}',
+    '.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}'
+  ].join('\n');
+
+  function injectStyles () {
+    var s = document.createElement('style');
+    s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+
+  /* ============================== local (per-device) state ============================== */
+
+  var NAME_KEY = 'handleliste_name_v1';
+  var ACTIVE_LIST_KEY = 'handleliste_active_list_v1';
+  var FIREBASE_CONFIG_KEY = 'handleliste_firebase_config_v1';
+  var DOC_COLLECTION = 'handleliste-app';
+  var DOC_ID = 'shared-state';
+
+  function getName () {
+    try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; }
+  }
+  function setName (n) {
+    try { localStorage.setItem(NAME_KEY, n.trim()); } catch (e) {}
+  }
+  function getStoredActiveListId () {
+    try { return localStorage.getItem(ACTIVE_LIST_KEY) || null; } catch (e) { return null; }
+  }
+  function setStoredActiveListId (id) {
+    try { localStorage.setItem(ACTIVE_LIST_KEY, id); } catch (e) {}
+  }
+  function getStoredFirebaseConfig () {
+    try { var raw = localStorage.getItem(FIREBASE_CONFIG_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function storeFirebaseConfig (cfg) {
+    try { localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  function clearStoredFirebaseConfig () {
+    try { localStorage.removeItem(FIREBASE_CONFIG_KEY); } catch (e) {}
+  }
+  function parseConfigInput (text) {
+    var cleaned = (text || '').trim();
+    cleaned = cleaned.replace(/^\s*(export\s+default\s+|const\s+\w+\s*=\s*|var\s+\w+\s*=\s*|let\s+\w+\s*=\s*)/, '');
+    cleaned = cleaned.replace(/;\s*$/, '');
+    var obj;
+    try { obj = (new Function('return (' + cleaned + ')'))(); } catch (e) { return null; }
+    if (!obj || typeof obj !== 'object' || !obj.apiKey || !obj.projectId) return null;
+    return obj;
+  }
+  function initials (n) {
+    n = (n || '?').trim();
+    if (!n) return '?';
+    var parts = n.split(/\s+/);
+    var a = parts[0] ? parts[0][0] : '';
+    var b = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (a + b).toUpperCase();
+  }
+  function uid () {
+    return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  /* ============================== shared state + migration ============================== */
+
+  function normalizeName (n) {
+    return (n || '').toString().trim().replace(/\s+/g, ' ');
+  }
+  function normalizeQty (q) {
+    if (typeof q === 'number' && isFinite(q) && q >= 1) return Math.round(q);
+    if (typeof q === 'string') {
+      var m = q.match(/\d+/);
+      if (m) { var n = parseInt(m[0], 10); if (n >= 1) return n; }
+    }
+    return 1;
+  }
+  function normalizeAndMergeItems (items) {
+    var order = [];
+    var map = {};
+    (items || []).forEach(function (raw) {
+      var name = normalizeName(raw && raw.name);
+      if (!name) return;
+      var item = {
+        id: (raw && raw.id) || uid(),
+        name: name,
+        qty: normalizeQty(raw && raw.qty),
+        checked: !!(raw && raw.checked),
+        addedBy: (raw && raw.addedBy) || null,
+        checkedBy: (raw && raw.checkedBy) || null,
+        addedAt: (raw && typeof raw.addedAt === 'number') ? raw.addedAt : Date.now()
+      };
+      var key = name.toLowerCase() + '|' + (item.checked ? '1' : '0');
+      if (map[key]) { map[key].qty += item.qty; }
+      else { map[key] = item; order.push(key); }
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+  function normalizeIngredients (raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(function (ing) {
+      return { name: normalizeName(ing && ing.name), qty: normalizeQty(ing && ing.qty) };
+    }).filter(function (ing) { return ing.name; });
+  }
+  function migrateState (raw) {
+    var lists;
+    if (raw && Array.isArray(raw.lists) && raw.lists.length) {
+      lists = raw.lists.map(function (l) {
+        return {
+          id: (l && l.id) || uid(),
+          name: normalizeName(l && l.name) || 'Liste',
+          items: normalizeAndMergeItems(l && l.items)
+        };
+      });
+    } else if (raw && Array.isArray(raw.items)) {
+      lists = [{ id: uid(), name: 'Handleliste', items: normalizeAndMergeItems(raw.items) }];
+    } else {
+      lists = [{ id: uid(), name: 'Handleliste', items: [] }];
+    }
+    var recipes = [];
+    if (raw && Array.isArray(raw.recipes)) {
+      recipes = raw.recipes.map(function (r) {
+        return {
+          id: (r && r.id) || uid(),
+          name: normalizeName(r && r.name) || 'Oppskrift',
+          ingredients: normalizeIngredients(r && r.ingredients)
+        };
+      }).filter(function (r) { return r.ingredients.length > 0; });
+    }
+    return { lists: lists, recipes: recipes };
+  }
+
+  var state = { lists: [{ id: uid(), name: 'Handleliste', items: [] }], recipes: [] };
+  var activeListId = getStoredActiveListId();
+
+  function ensureActiveList () {
+    if (!state.lists.length) state.lists.push({ id: uid(), name: 'Handleliste', items: [] });
+    var found = false;
+    state.lists.forEach(function (l) { if (l.id === activeListId) found = true; });
+    if (!found) { activeListId = state.lists[0].id; setStoredActiveListId(activeListId); }
+  }
+  function getActiveList () {
+    ensureActiveList();
+    var found = null;
+    state.lists.forEach(function (l) { if (l.id === activeListId) found = l; });
+    return found;
+  }
+  function setActiveList (id) {
+    activeListId = id;
+    setStoredActiveListId(id);
+    draftName = '';
+    draftQty = 1;
+    render();
+  }
+
+  var fbApp = null, fbAuth = null, fbDb = null, fbDocRef = null, fbUnsubscribe = null;
+  var isWriter = false;
+  var saveTimer = null;
+  var pendingSave = false;
+  var statusState = 'connecting';
+  var draftName = '';
+  var draftQty = 1;
+  var currentView = 'lists';
+
+  function setView (v) {
+    currentView = v;
+    render();
+  }
+
+  /* ============================== dom helpers ============================== */
+
+  function el (tag, attrs, kids) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'text') node.textContent = attrs[k];
+      else if (k === 'html') node.innerHTML = attrs[k];
+      else if (k === 'disabled') { if (attrs[k]) node.disabled = true; }
+      else if (k.indexOf('on') === 0 && typeof attrs[k] === 'function') node.addEventListener(k.slice(2), attrs[k]);
+      else node.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+
+  var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  var ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>';
+  var ICON_CART = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 8H6"></path></svg>';
+  var ICON_PENCIL = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
+  var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
+  var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
+  var ICON_PLUS_BIG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
+
+  var root = el('div', { id: 'root' });
+  document.body.appendChild(root);
+
+  /* ============================== rendering ============================== */
+
+  function render () {
+    root.innerHTML = '';
+    var list = getActiveList();
+
+    var brand = el('div', { class: 'brand' }, [
+      el('div', { class: 'brand-mark', html: ICON_CART }),
+      el('div', {}, [
+        el('h1', { text: 'Handleliste' }),
+        el('p', { text: itemsSummary(list) })
+      ])
+    ]);
+
+    var who = getName()
+      ? el('div', { class: 'who' }, [
+          el('span', { class: 'avatar', text: initials(getName()) }),
+          el('span', { text: getName() }),
+          el('button', { text: 'bytt', onclick: function () { showNameModal(true); } })
+        ])
+      : el('div', { class: 'who' }, [ el('button', { text: 'skriv inn navn', onclick: function () { showNameModal(true); } }) ]);
+
+    root.appendChild(el('header', { class: 'app-header' }, [brand, who]));
+
+    var status = el('div', { class: 'status-row', 'data-state': statusState }, [
+      el('span', { class: 'status-dot' }),
+      el('span', { text: statusText() })
+    ]);
+    root.appendChild(status);
+    root.appendChild(buildViewSwitch());
+
+    if (currentView === 'recipes') {
+      root.appendChild(buildRecipesView(list));
+    } else {
+      root.appendChild(buildTabsRow(list));
+      root.appendChild(buildAddForm(list));
+      root.appendChild(buildList(list));
+
+      var checkedCount = list.items.filter(function (i) { return i.checked; }).length;
+      if (checkedCount > 0) {
+        root.appendChild(el('div', { class: 'footer-row' }, [
+          el('button', { class: 'clear-btn', text: 'Tøm avkryssede (' + checkedCount + ')', onclick: function () { clearChecked(); } })
+        ]));
+      }
+    }
+
+    var hint = el('p', { class: 'hint' });
+    hint.appendChild(document.createTextNode('Listene oppdateres automatisk på begge telefoner. Legg til denne siden på hjemskjermen for rask tilgang. '));
+    var reconnectBtn = el('button', { class: 'link-btn', type: 'button', text: 'Endre tilkobling' });
+    reconnectBtn.addEventListener('click', function () {
+      showConfirmModal({
+        title: 'Endre tilkobling?',
+        description: 'Denne telefonen kobles fra den delte listen. Du kan koble til igjen med samme eller en annen Firebase-konfigurasjon.',
+        confirmLabel: 'Koble fra',
+        cancelLabel: 'Avbryt',
+        danger: true,
+        onConfirm: function () { reconnect(); }
+      });
+    });
+    hint.appendChild(reconnectBtn);
+    root.appendChild(hint);
+
+    if (!getName()) showNameModal(false);
+  }
+
+  function buildViewSwitch () {
+    var listsBtn = el('button', { type: 'button', class: currentView === 'lists' ? 'active' : '', text: 'Handlelister' });
+    var recipesBtn = el('button', { type: 'button', class: currentView === 'recipes' ? 'active' : '', text: 'Oppskrifter' });
+    listsBtn.addEventListener('click', function () { setView('lists'); });
+    recipesBtn.addEventListener('click', function () { setView('recipes'); });
+    return el('div', { class: 'view-switch' }, [listsBtn, recipesBtn]);
+  }
+
+  function itemsSummary (list) {
+    var total = list.items.length;
+    var left = list.items.filter(function (i) { return !i.checked; }).length;
+    if (total === 0) return list.name;
+    return list.name + ' – ' + left + ' av ' + total + ' igjen';
+  }
+
+  function statusText () {
+    switch (statusState) {
+      case 'connecting': return 'Kobler til …';
+      case 'saving': return 'Lagrer …';
+      case 'saved': return 'Lagret – synkronisert';
+      case 'error': return 'Mistet kontakt – prøver igjen …';
+      default: return 'Klar';
+    }
+  }
+
+  function buildTabsRow (activeList) {
+    var row = el('div', { class: 'list-tabs' });
+    state.lists.forEach(function (l) {
+      row.appendChild(buildTab(l));
+    });
+    var addTab = el('button', { class: 'tab tab-add', type: 'button' }, [ el('span', { class: 'tab-name', text: '+ Ny liste' }) ]);
+    addTab.addEventListener('click', showCreateListModal);
+    row.appendChild(addTab);
+    return row;
+  }
+
+  function buildTab (list) {
+    var isActive = list.id === activeListId;
+    if (!isActive) {
+      var btn = el('button', { class: 'tab', type: 'button' }, [ el('span', { class: 'tab-name', text: list.name }) ]);
+      btn.addEventListener('click', function () { setActiveList(list.id); });
+      return btn;
+    }
+    var kids = [ el('span', { class: 'tab-name', text: list.name }) ];
+    var editBtn = el('button', { class: 'tab-icon-btn', type: 'button', 'aria-label': 'Endre navn på listen', html: ICON_PENCIL });
+    editBtn.addEventListener('click', function () { showRenameListModal(list); });
+    kids.push(editBtn);
+    if (state.lists.length > 1) {
+      var delBtn = el('button', { class: 'tab-icon-btn', type: 'button', 'aria-label': 'Slett listen', html: ICON_TRASH });
+      delBtn.addEventListener('click', function () { confirmDeleteList(list); });
+      kids.push(delBtn);
+    }
+    return el('div', { class: 'tab active' }, kids);
+  }
+
+  function buildAddForm (list) {
+    if (draftQty < 1) draftQty = 1;
+    var nameInput = el('input', { type: 'text', name: 'itemName', placeholder: 'Legg til vare …', autocomplete: 'off', maxlength: '80', value: draftName });
+    nameInput.addEventListener('input', function () { draftName = nameInput.value; });
+
+    var qtyValue = el('span', { class: 'qty-value', text: String(draftQty) });
+    var minusBtn = el('button', { type: 'button', 'aria-label': 'Reduser antall' , html: ICON_MINUS });
+    var plusBtn = el('button', { type: 'button', 'aria-label': 'Øk antall', html: ICON_PLUS });
+    function syncMinus () { minusBtn.disabled = draftQty <= 1; }
+    minusBtn.addEventListener('click', function () { if (draftQty > 1) { draftQty--; qtyValue.textContent = String(draftQty); syncMinus(); } });
+    plusBtn.addEventListener('click', function () { if (draftQty < 999) { draftQty++; qtyValue.textContent = String(draftQty); syncMinus(); } });
+    syncMinus();
+    var stepper = el('div', { class: 'qty-stepper' }, [minusBtn, qtyValue, plusBtn]);
+
+    var addBtn = el('button', { class: 'add-btn', type: 'submit', 'aria-label': 'Legg til vare', html: ICON_PLUS_BIG });
+    var form = el('form', { class: 'add-form' }, [
+      el('div', { class: 'fields' }, [nameInput, stepper]),
+      addBtn
+    ]);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var nameToAdd = nameInput.value;
+      var qtyToAdd = draftQty;
+      draftName = '';
+      draftQty = 1;
+      addItem(list.id, nameToAdd, qtyToAdd);
+      var freshInput = root.querySelector('input[name="itemName"]');
+      if (freshInput) freshInput.focus();
+    });
+    return form;
+  }
+
+  function buildList (list) {
+    var section = el('section', { class: 'list-section' });
+    if (list.items.length === 0) {
+      section.appendChild(el('div', { class: 'empty-state' }, [
+        el('h3', { text: 'Listen er tom' }),
+        el('p', { text: 'Legg til den første varen i «' + list.name + '».' })
+      ]));
+      return section;
+    }
+    var unchecked = list.items.filter(function (i) { return !i.checked; });
+    var checked = list.items.filter(function (i) { return i.checked; });
+
+    if (unchecked.length) section.appendChild(buildGroup(list, unchecked));
+    if (checked.length) {
+      section.appendChild(el('p', { class: 'group-label', text: 'Kjøpt' }));
+      section.appendChild(buildGroup(list, checked));
+    }
+    return section;
+  }
+
+  function buildGroup (list, items) {
+    var ul = el('ul', { class: 'item-list' });
+    items.forEach(function (item) { ul.appendChild(buildItem(list, item)); });
+    return ul;
+  }
+
+  function buildItem (list, item) {
+    var meta = '';
+    if (item.checked && item.checkedBy) meta = 'Krysset av av ' + item.checkedBy;
+    else if (item.addedBy) meta = 'Lagt til av ' + item.addedBy;
+
+    var body = el('div', { class: 'item-body' }, [
+      el('span', { class: 'item-name', text: item.name }),
+      meta ? el('div', { class: 'item-meta', text: meta }) : null
+    ]);
+
+    var checkBtn = el('button', { class: 'check-btn', 'aria-label': 'Kryss av ' + item.name, html: ICON_CHECK });
+
+    var qtyControl;
+    if (!item.checked) {
+      var qtyValue = el('span', { class: 'qty-value', text: String(item.qty) });
+      var minusBtn = el('button', { type: 'button', 'aria-label': 'Reduser antall for ' + item.name, html: ICON_MINUS, disabled: item.qty <= 1 });
+      var plusBtn = el('button', { type: 'button', 'aria-label': 'Øk antall for ' + item.name, html: ICON_PLUS });
+      minusBtn.addEventListener('click', function () { changeQty(list.id, item.id, -1); });
+      plusBtn.addEventListener('click', function () { changeQty(list.id, item.id, 1); });
+      qtyControl = el('div', { class: 'qty-stepper sm' }, [minusBtn, qtyValue, plusBtn]);
+    } else {
+      qtyControl = el('span', { class: 'item-qty static', text: '× ' + item.qty });
+    }
+
+    var li = el('li', { class: 'item' + (item.checked ? ' is-checked' : '') });
+    [checkBtn, body, qtyControl].forEach(function (c) { li.appendChild(c); });
+
+    checkBtn.addEventListener('click', function () { toggleItem(list.id, item.id); });
+    var delBtn = el('button', { class: 'del-btn', 'aria-label': 'Slett ' + item.name, html: ICON_TRASH });
+    delBtn.addEventListener('click', function () { deleteItem(list.id, item.id); });
+    li.appendChild(delBtn);
+    return li;
+  }
+
+  function buildRecipesView (activeList) {
+    var section = el('section', { class: 'list-section' });
+
+    var addRecipeBtn = el('button', { type: 'button', class: 'add-recipe-btn', text: '+ Ny oppskrift' });
+    addRecipeBtn.addEventListener('click', function () { showRecipeEditor(null); });
+    section.appendChild(addRecipeBtn);
+
+    if (state.recipes.length === 0) {
+      section.appendChild(el('div', { class: 'empty-state' }, [
+        el('h3', { text: 'Ingen oppskrifter ennå' }),
+        el('p', { text: 'Opprett din første oppskrift, så kan dere legge alle ingrediensene i handlelisten med ett trykk.' })
+      ]));
+      return section;
+    }
+
+    var listEl = el('div', { class: 'recipe-list' });
+    state.recipes.forEach(function (r) { listEl.appendChild(buildRecipeCard(activeList, r)); });
+    section.appendChild(listEl);
+    return section;
+  }
+
+  function buildRecipeCard (activeList, recipe) {
+    var editBtn = el('button', { class: 'tab-icon-btn', type: 'button', 'aria-label': 'Rediger oppskrift', html: ICON_PENCIL });
+    editBtn.addEventListener('click', function () { showRecipeEditor(recipe); });
+    var delBtn = el('button', { class: 'tab-icon-btn', type: 'button', 'aria-label': 'Slett oppskrift', html: ICON_TRASH });
+    delBtn.addEventListener('click', function () { confirmDeleteRecipe(recipe); });
+
+    var head = el('div', { class: 'recipe-card-head' }, [
+      el('h3', { text: recipe.name }),
+      el('div', { class: 'recipe-card-actions' }, [editBtn, delBtn])
+    ]);
+
+    var preview = recipe.ingredients.map(function (i) {
+      return i.qty > 1 ? (i.name + ' (' + i.qty + ')') : i.name;
+    }).join(', ');
+
+    var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
+    addBtn.addEventListener('click', function () { applyRecipeToActiveList(recipe); });
+
+    return el('div', { class: 'recipe-card' }, [head, el('p', { class: 'recipe-ing-preview', text: preview }), addBtn]);
+  }
+
+  /* ============================== modals ============================== */
+
+  function closeOverlay () {
+    var existing = document.getElementById('modal-overlay');
+    if (existing) existing.remove();
+  }
+
+  function showPromptModal (opts) {
+    closeOverlay();
+    var input = el('input', { type: 'text', placeholder: opts.placeholder || '', maxlength: String(opts.maxlength || 40), value: opts.initialValue || '' });
+    var saveBtn = el('button', { class: 'primary', type: 'submit', text: opts.confirmLabel || 'Lagre' });
+    var form = el('form', {}, [input, saveBtn]);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = input.value.trim();
+      if (!v) return;
+      closeOverlay();
+      opts.onSave(v);
+    });
+    var modalKids = [el('h2', { text: opts.title })];
+    if (opts.description) modalKids.push(el('p', { text: opts.description }));
+    modalKids.push(form);
+    var modal = el('div', { class: 'modal' }, modalKids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    if (opts.dismissible) overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+    setTimeout(function () { input.focus(); if (input.select) input.select(); }, 30);
+  }
+
+  function showConfirmModal (opts) {
+    closeOverlay();
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: opts.cancelLabel || 'Avbryt' });
+    var confirmBtn = el('button', { class: 'primary' + (opts.danger ? ' danger' : ''), type: 'button', text: opts.confirmLabel || 'Bekreft' });
+    cancelBtn.addEventListener('click', closeOverlay);
+    confirmBtn.addEventListener('click', function () { closeOverlay(); opts.onConfirm(); });
+    var actions = el('div', { class: 'modal-actions' }, [cancelBtn, confirmBtn]);
+    var modalKids = [el('h2', { text: opts.title })];
+    if (opts.description) modalKids.push(el('p', { text: opts.description }));
+    modalKids.push(actions);
+    var modal = el('div', { class: 'modal' }, modalKids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+  }
+
+  function showNameModal (dismissible) {
+    showPromptModal({
+      title: 'Hva heter du?',
+      description: 'Navnet lagres kun på denne telefonen, og vises på varene du legger til eller krysser av.',
+      placeholder: 'F.eks. Andreas',
+      initialValue: getName(),
+      confirmLabel: 'Lagre',
+      maxlength: 30,
+      dismissible: dismissible,
+      onSave: function (v) { setName(v); render(); }
+    });
+  }
+
+  function showCreateListModal () {
+    showPromptModal({
+      title: 'Ny liste',
+      description: 'Gi listen et navn, f.eks. «Matbutikken» eller «Apotek».',
+      placeholder: 'Navn på liste',
+      initialValue: '',
+      confirmLabel: 'Opprett',
+      maxlength: 40,
+      dismissible: true,
+      onSave: function (v) { addList(v); }
+    });
+  }
+
+  function showRenameListModal (list) {
+    showPromptModal({
+      title: 'Endre navn på listen',
+      placeholder: 'Navn på liste',
+      initialValue: list.name,
+      confirmLabel: 'Lagre',
+      maxlength: 40,
+      dismissible: true,
+      onSave: function (v) { renameList(list.id, v); }
+    });
+  }
+
+  function confirmDeleteList (list) {
+    var count = list.items.length;
+    showConfirmModal({
+      title: 'Slette «' + list.name + '»?',
+      description: (count > 0 ? ('Listen har ' + count + ' vare' + (count === 1 ? '' : 'r') + '. ') : '') + 'Dette kan ikke angres.',
+      confirmLabel: 'Slett liste',
+      cancelLabel: 'Avbryt',
+      danger: true,
+      onConfirm: function () { deleteList(list.id); }
+    });
+  }
+
+  function showRecipeEditor (existing) {
+    closeOverlay();
+    var draft = {
+      name: existing ? existing.name : '',
+      ingredients: existing && existing.ingredients.length
+        ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty }; })
+        : [{ name: '', qty: 1 }]
+    };
+
+    var nameInput = el('input', { type: 'text', class: 'recipe-name-input', placeholder: 'F.eks. Tacogryte', maxlength: '60', value: draft.name });
+    nameInput.addEventListener('input', function () { draft.name = nameInput.value; });
+
+    var rowsContainer = el('div', { class: 'ingredient-rows' });
+
+    function buildIngredientRow (ing, idx) {
+      var nameField = el('input', { type: 'text', placeholder: 'Ingrediens', maxlength: '60', value: ing.name });
+      nameField.addEventListener('input', function () { ing.name = nameField.value; });
+
+      var qtyValue = el('span', { class: 'qty-value', text: String(ing.qty) });
+      var minusBtn = el('button', { type: 'button', 'aria-label': 'Reduser antall', html: ICON_MINUS, disabled: ing.qty <= 1 });
+      var plusBtn = el('button', { type: 'button', 'aria-label': 'Øk antall', html: ICON_PLUS });
+      minusBtn.addEventListener('click', function () {
+        if (ing.qty > 1) { ing.qty--; qtyValue.textContent = String(ing.qty); minusBtn.disabled = ing.qty <= 1; }
+      });
+      plusBtn.addEventListener('click', function () {
+        if (ing.qty < 999) { ing.qty++; qtyValue.textContent = String(ing.qty); minusBtn.disabled = false; }
+      });
+      var stepper = el('div', { class: 'qty-stepper sm' }, [minusBtn, qtyValue, plusBtn]);
+
+      var removeBtn = el('button', { type: 'button', class: 'ingredient-remove', 'aria-label': 'Fjern ingrediens', html: ICON_TRASH });
+      removeBtn.addEventListener('click', function () {
+        if (draft.ingredients.length <= 1) {
+          ing.name = '';
+          ing.qty = 1;
+          renderRows();
+          return;
+        }
+        draft.ingredients.splice(idx, 1);
+        renderRows();
+      });
+
+      return el('div', { class: 'ingredient-row' }, [nameField, stepper, removeBtn]);
+    }
+
+    function renderRows () {
+      rowsContainer.innerHTML = '';
+      draft.ingredients.forEach(function (ing, idx) {
+        rowsContainer.appendChild(buildIngredientRow(ing, idx));
+      });
+    }
+    renderRows();
+
+    var addIngBtn = el('button', { type: 'button', class: 'add-ingredient-btn', text: '+ Legg til ingrediens' });
+    addIngBtn.addEventListener('click', function () { draft.ingredients.push({ name: '', qty: 1 }); renderRows(); });
+
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
+    cancelBtn.addEventListener('click', closeOverlay);
+    var saveBtn = el('button', { class: 'primary', type: 'submit', text: existing ? 'Lagre endringer' : 'Opprett oppskrift' });
+    var actions = el('div', { class: 'modal-actions' }, [cancelBtn, saveBtn]);
+
+    var form = el('form', {}, [nameInput, rowsContainer, addIngBtn, actions]);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = draft.name.trim();
+      if (!name) { nameInput.focus(); return; }
+      var validIngredients = normalizeIngredients(draft.ingredients);
+      if (!validIngredients.length) return;
+      closeOverlay();
+      if (existing) updateRecipe(existing.id, name, validIngredients);
+      else addRecipe(name, validIngredients);
+    });
+
+    var modal = el('div', { class: 'modal wide' }, [
+      el('h2', { text: existing ? 'Rediger oppskrift' : 'Ny oppskrift' }),
+      form
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+    setTimeout(function () { nameInput.focus(); }, 30);
+  }
+
+  function confirmDeleteRecipe (recipe) {
+    showConfirmModal({
+      title: 'Slette «' + recipe.name + '»?',
+      description: 'Dette kan ikke angres.',
+      confirmLabel: 'Slett oppskrift',
+      cancelLabel: 'Avbryt',
+      danger: true,
+      onConfirm: function () { deleteRecipe(recipe.id); }
+    });
+  }
+
+  /* ============================== list actions ============================== */
+
+  function addList (name) {
+    name = normalizeName(name);
+    if (!name) return;
+    var list = { id: uid(), name: name, items: [] };
+    state.lists.push(list);
+    activeListId = list.id;
+    setStoredActiveListId(list.id);
+    draftName = '';
+    draftQty = 1;
+    render();
+    scheduleSave();
+  }
+
+  function renameList (id, name) {
+    name = normalizeName(name);
+    if (!name) return;
+    var list = null;
+    state.lists.forEach(function (l) { if (l.id === id) list = l; });
+    if (!list) return;
+    list.name = name;
+    render();
+    scheduleSave();
+  }
+
+  function deleteList (id) {
+    if (state.lists.length <= 1) return;
+    state.lists = state.lists.filter(function (l) { return l.id !== id; });
+    if (activeListId === id) {
+      activeListId = state.lists[0].id;
+      setStoredActiveListId(activeListId);
+    }
+    render();
+    scheduleSave();
+  }
+
+  /* ============================== item actions ============================== */
+
+  function findList (listId) {
+    var found = null;
+    state.lists.forEach(function (l) { if (l.id === listId) found = l; });
+    return found;
+  }
+
+  function mergeItemIntoList (list, name, qty, adder) {
+    name = normalizeName(name);
+    if (!name) return;
+    qty = normalizeQty(qty);
+    var match = null;
+    for (var i = 0; i < list.items.length; i++) {
+      var it = list.items[i];
+      if (!it.checked && it.name.toLowerCase() === name.toLowerCase()) { match = it; break; }
+    }
+    if (match) {
+      match.qty += qty;
+    } else {
+      list.items.push({
+        id: uid(),
+        name: name,
+        qty: qty,
+        checked: false,
+        addedBy: adder || null,
+        checkedBy: null,
+        addedAt: Date.now()
+      });
+    }
+  }
+
+  function addItem (listId, name, qty) {
+    var list = findList(listId);
+    if (!list) return;
+    mergeItemIntoList(list, name, qty, getName());
+    render();
+    scheduleSave();
+  }
+
+  function toggleItem (listId, itemId) {
+    var list = findList(listId);
+    if (!list) return;
+    var item = null;
+    for (var i = 0; i < list.items.length; i++) { if (list.items[i].id === itemId) { item = list.items[i]; break; } }
+    if (!item) return;
+    item.checked = !item.checked;
+    item.checkedBy = item.checked ? (getName() || null) : null;
+    render();
+    scheduleSave();
+  }
+
+  function changeQty (listId, itemId, delta) {
+    var list = findList(listId);
+    if (!list) return;
+    var item = null;
+    for (var i = 0; i < list.items.length; i++) { if (list.items[i].id === itemId) { item = list.items[i]; break; } }
+    if (!item) return;
+    var next = item.qty + delta;
+    if (next < 1) next = 1;
+    if (next > 999) next = 999;
+    if (next === item.qty) return;
+    item.qty = next;
+    render();
+    scheduleSave();
+  }
+
+  function deleteItem (listId, itemId) {
+    var list = findList(listId);
+    if (!list) return;
+    list.items = list.items.filter(function (i) { return i.id !== itemId; });
+    render();
+    scheduleSave();
+  }
+
+  function clearChecked () {
+    var list = getActiveList();
+    list.items = list.items.filter(function (i) { return !i.checked; });
+    render();
+    scheduleSave();
+  }
+
+  /* ============================== recipe actions ============================== */
+
+  function findRecipe (id) {
+    var found = null;
+    state.recipes.forEach(function (r) { if (r.id === id) found = r; });
+    return found;
+  }
+
+  function addRecipe (name, ingredients) {
+    state.recipes.push({ id: uid(), name: name, ingredients: ingredients });
+    render();
+    scheduleSave();
+  }
+
+  function updateRecipe (id, name, ingredients) {
+    var recipe = findRecipe(id);
+    if (!recipe) return;
+    recipe.name = name;
+    recipe.ingredients = ingredients;
+    render();
+    scheduleSave();
+  }
+
+  function deleteRecipe (id) {
+    state.recipes = state.recipes.filter(function (r) { return r.id !== id; });
+    render();
+    scheduleSave();
+  }
+
+  function applyRecipeToActiveList (recipe) {
+    var list = getActiveList();
+    var adder = getName();
+    recipe.ingredients.forEach(function (ing) { mergeItemIntoList(list, ing.name, ing.qty, adder); });
+    currentView = 'lists';
+    render();
+    scheduleSave();
+  }
+
+  /* ============================== persistence (Firebase) ============================== */
+
+  function setStatus (s) {
+    statusState = s;
+    var row = document.querySelector('.status-row');
+    if (row) { row.setAttribute('data-state', s); row.lastChild.textContent = statusText(); }
+  }
+
+  function scheduleSave () {
+    if (!isWriter) return;
+    pendingSave = true;
+    setStatus('saving');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 650);
+  }
+
+  function doSave () {
+    if (!isWriter || !fbDocRef) return;
+    pendingSave = false;
+    setDoc(fbDocRef, state).then(function () {
+      setStatus('saved');
+    }).catch(function () {
+      setStatus('error');
+      saveTimer = setTimeout(doSave, 3000);
+    });
+  }
+
+  function startListening () {
+    isWriter = true;
+    fbUnsubscribe = onSnapshot(fbDocRef, function (snap) {
+      var raw = snap.exists() ? snap.data() : { lists: [], recipes: [] };
+      var rawJson = JSON.stringify(raw);
+      state = migrateState(raw);
+      ensureActiveList();
+      setStatus('saved');
+      render();
+      if (!snap.exists() || JSON.stringify(state) !== rawJson) scheduleSave();
+    }, function () {
+      setStatus('error');
+    });
+  }
+
+  function connectFirebase (cfg, onError) {
+    try {
+      fbApp = initializeApp(cfg);
+      fbAuth = getAuth(fbApp);
+      fbDb = getFirestore(fbApp);
+      fbDocRef = doc(fbDb, DOC_COLLECTION, DOC_ID);
+    } catch (e) {
+      onError('Klarte ikke å tolke konfigurasjonen. Sjekk at du limte inn hele firebaseConfig-blokken.');
+      return;
+    }
+    signInAnonymously(fbAuth).then(function () {
+      return getDoc(fbDocRef);
+    }).then(function () {
+      storeFirebaseConfig(cfg);
+      render();
+      startListening();
+    }).catch(function (err) {
+      var code = err && err.code;
+      var msg = 'Klarte ikke å koble til Firebase. Sjekk konfigurasjonen og internettforbindelsen.';
+      if (code === 'auth/operation-not-allowed') {
+        msg = 'Anonym innlogging er ikke slått på i Firebase-prosjektet. Gå til Authentication → Sign-in method og slå på «Anonymous».';
+      } else if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+        msg = 'Firebase avviste tilgangen. Sjekk sikkerhetsreglene for Firestore.';
+      } else if (code === 'auth/invalid-api-key' || code === 'auth/api-key-not-valid') {
+        msg = 'API-nøkkelen ser ikke riktig ut. Sjekk at du kopierte hele konfigurasjonen.';
+      }
+      onError(msg);
+    });
+  }
+
+  function reconnect () {
+    if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+    clearStoredFirebaseConfig();
+    fbApp = null; fbAuth = null; fbDb = null; fbDocRef = null;
+    isWriter = false;
+    renderSetupGate();
+  }
+
+  /* ============================== setup gate ============================== */
+
+  function renderSetupGate (errorMsg) {
+    root.innerHTML = '';
+    var card = el('div', { class: 'setup-card' });
+    card.appendChild(el('div', { class: 'brand' }, [
+      el('div', { class: 'brand-mark', html: ICON_CART }),
+      el('h1', { text: 'Vår Handleliste' })
+    ]));
+    card.appendChild(el('h2', { text: 'Koble til deling' }));
+    card.appendChild(el('p', { text: 'Lim inn firebaseConfig-koden fra Firebase-prosjektet ditt (Prosjektinnstillinger → Dine apper → Web-app). Gjør nøyaktig det samme på begge telefonene, så synkroniseres listene mellom dem automatisk.' }));
+
+    var textarea = el('textarea', { class: 'config-textarea', placeholder: 'const firebaseConfig = {\n  apiKey: "...",\n  authDomain: "...",\n  projectId: "...",\n  ...\n};' });
+    card.appendChild(textarea);
+
+    if (errorMsg) card.appendChild(el('p', { class: 'field-error', text: errorMsg }));
+
+    var connectBtn = el('button', { class: 'primary', type: 'button', text: 'Koble til' });
+    connectBtn.addEventListener('click', function () {
+      var cfg = parseConfigInput(textarea.value);
+      if (!cfg) { renderSetupGate('Fant ikke en gyldig firebaseConfig i det du limte inn. Sjekk at du kopierte hele blokken, inkludert apiKey og projectId.'); return; }
+      connectBtn.disabled = true;
+      connectBtn.textContent = 'Kobler til …';
+      connectFirebase(cfg, function (msg) { renderSetupGate(msg); });
+    });
+    card.appendChild(connectBtn);
+
+    root.appendChild(el('div', { class: 'setup-screen' }, [card]));
+  }
+
+  /* ============================== boot ============================== */
+
+  injectStyles();
+  var storedCfg = getStoredFirebaseConfig();
+  if (storedCfg) {
+    root.appendChild(el('div', { class: 'setup-screen' }, [
+      el('div', { class: 'empty-state' }, [ el('h3', { text: 'Kobler til …' }), el('p', { text: 'Henter den delte listen din.' }) ])
+    ]));
+    connectFirebase(storedCfg, function (msg) {
+      clearStoredFirebaseConfig();
+      renderSetupGate(msg);
+    });
+  } else {
+    renderSetupGate();
+  }
+})();
+</script>
+</body>
+</html>
