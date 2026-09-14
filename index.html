@@ -4,10 +4,140 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vår Handleliste</title>
+<meta name="description" content="Delt handleliste for to – synkroniseres automatisk mellom telefonene.">
+
+<!-- Installerbar app (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2E6B3C" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121A13" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Handleliste">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  #offline-bar{
+    position:fixed; left:50%; transform:translateX(-50%) translateY(140%);
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    z-index:9999; max-width:calc(100vw - 32px);
+    display:flex; align-items:center; gap:8px;
+    padding:9px 15px; border-radius:999px;
+    background:#3B2A21; color:#F7E4D6;
+    font-family:"Work Sans",system-ui,sans-serif; font-size:13.5px; font-weight:500;
+    box-shadow:0 8px 24px -10px rgba(0,0,0,0.55);
+    transition:transform .28s cubic-bezier(.2,.8,.3,1);
+    pointer-events:none;
+  }
+  #offline-bar.is-visible{ transform:translateX(-50%) translateY(0); }
+  #offline-bar span.dot{
+    width:8px; height:8px; border-radius:50%; background:#F0906A; flex:none;
+  }
+  @media (prefers-reduced-motion: reduce){ #offline-bar{ transition:none; } }
+
+  #install-btn{
+    position:fixed; right:16px; z-index:9998;
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    display:none; align-items:center; gap:7px;
+    padding:11px 17px; border:0; border-radius:999px; cursor:pointer;
+    background:#2E6B3C; color:#FBFFF7;
+    font-family:"Work Sans",system-ui,sans-serif; font-size:14px; font-weight:600;
+    box-shadow:0 10px 26px -12px rgba(24,32,20,0.7);
+  }
+  #install-btn.is-visible{ display:inline-flex; }
+  #install-btn:active{ background:#204E2B; }
+  #install-btn svg{ width:16px; height:16px; flex:none; }
+  @media (prefers-color-scheme: dark){
+    #install-btn{ background:#6BC97E; color:#0E1A0F; }
+    #install-btn:active{ background:#8CDB9B; }
+  }
+</style>
 </head>
 <body>
+
+<!-- ============ PWA: installasjon, offline-varsel, service worker ============ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ---- Offline-varsel ---- */
+  var bar = document.createElement('div');
+  bar.id = 'offline-bar';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = '<span class="dot"></span><span>Ingen nett – endringer sendes når du er tilkoblet igjen</span>';
+  document.body.appendChild(bar);
+
+  function syncOnlineState () {
+    if (navigator.onLine) bar.classList.remove('is-visible');
+    else bar.classList.add('is-visible');
+  }
+  window.addEventListener('online', syncOnlineState);
+  window.addEventListener('offline', syncOnlineState);
+  syncOnlineState();
+
+  /* ---- «Installer app»-knapp ----
+   * Chrome/Android sender beforeinstallprompt når appen kan installeres og
+   * ikke allerede er installert. Da viser vi en knapp; ellers ingenting. */
+  var deferredPrompt = null;
+  var installBtn = document.createElement('button');
+  installBtn.id = 'install-btn';
+  installBtn.type = 'button';
+  installBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M12 3v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 20h16"></path></svg>' +
+    '<span>Installer app</span>';
+  document.body.appendChild(installBtn);
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.classList.add('is-visible');
+  });
+
+  installBtn.addEventListener('click', function () {
+    if (!deferredPrompt) { installBtn.classList.remove('is-visible'); return; }
+    var p = deferredPrompt;
+    deferredPrompt = null;
+    installBtn.classList.remove('is-visible');
+    p.prompt();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    installBtn.classList.remove('is-visible');
+  });
+
+  /* ---- Service worker ----
+   * Krever https (GitHub Pages) eller localhost. Åpnes filen rett fra disk
+   * hopper vi bare over det – appen fungerer likevel, bare uten offline. */
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        reg.addEventListener('updatefound', function () {
+          var incoming = reg.installing;
+          if (!incoming) return;
+          incoming.addEventListener('statechange', function () {
+            /* Ny versjon er klar: la den ta over med én gang, så er den i bruk
+             * neste gang appen åpnes. Vi laster bevisst IKKE siden på nytt –
+             * det ville kunne avbryte noen midt i å skrive inn en vare. */
+            if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+              incoming.postMessage('SKIP_WAITING');
+            }
+          });
+        });
+      }).catch(function () { /* uten service worker fungerer alt bortsett fra offline */ });
+    });
+  }
+})();
+</script>
+
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
@@ -98,6 +228,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.status-row[data-state="saved"] .status-dot{background:var(--accent);}',
     '.status-row[data-state="saving"] .status-dot{background:#D8A23A;animation:pulse 1s ease-in-out infinite;}',
     '.status-row[data-state="error"] .status-dot{background:var(--warn);}',
+    '.status-row[data-state="offline"] .status-dot{background:var(--muted);}',
+    '.status-row[data-state="pending"] .status-dot{background:var(--warn);}',
     '@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}',
     '.list-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px;margin:0 -2px 14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}',
     '.list-tabs::-webkit-scrollbar{display:none;}',
@@ -286,6 +418,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var NAME_KEY = 'handleliste_name_v1';
   var ACTIVE_LIST_KEY = 'handleliste_active_list_v1';
   var FIREBASE_CONFIG_KEY = 'handleliste_firebase_config_v1';
+  var STATE_CACHE_KEY = 'handleliste_state_cache_v1';
   var DOC_COLLECTION = 'handleliste-app';
   var DOC_ID = 'shared-state';
 
@@ -304,8 +437,19 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function getStoredFirebaseConfig () {
     try { var raw = localStorage.getItem(FIREBASE_CONFIG_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
+  /* Siste synkroniserte liste, lagret lokalt på denne telefonen. Brukes til å vise
+   * listen umiddelbart når appen åpnes – også helt uten nett. */
+  function getCachedState () {
+    try { var raw = localStorage.getItem(STATE_CACHE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function setCachedState (s) {
+    try { localStorage.setItem(STATE_CACHE_KEY, JSON.stringify(s)); } catch (e) {}
+  }
   function storeFirebaseConfig (cfg) {
     try { localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  function clearCachedState () {
+    try { localStorage.removeItem(STATE_CACHE_KEY); } catch (e) {}
   }
   function clearStoredFirebaseConfig () {
     try { localStorage.removeItem(FIREBASE_CONFIG_KEY); } catch (e) {}
@@ -344,26 +488,234 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     }
     return 1;
   }
-  function normalizeAndMergeItems (items) {
-    var order = [];
-    var map = {};
+  /* ===================================================================
+   * Sammenslåing av to versjoner av listen
+   *
+   * Begge telefonene kan endre den samme listen samtidig – og den ene kan i
+   * tillegg være uten nett en stund. Derfor kan vi ikke la «den som lagret
+   * sist» overskrive alt: da forsvinner den andres varer.
+   *
+   * I stedet har hver vare, liste og oppskrift sine egne tidsstempler, og vi
+   * fletter de to versjonene sammen rad for rad. Sletting lagres som et
+   * gravstein-merke («tombstone») i stedet for at raden bare fjernes – uten
+   * det ville en slettet vare kommet tilbake fra den andre telefonen ved
+   * neste synkronisering.
+   * =================================================================== */
+
+  var TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000; // gravsteiner ryddes etter 30 dager
+
+  function num (v, fallback) {
+    return (typeof v === 'number' && isFinite(v)) ? v : fallback;
+  }
+
+  /* Sammenligning som gir samme svar på begge telefoner, uansett rekkefølge. */
+  function stableJson (v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(function (k) {
+      return JSON.stringify(k) + ':' + stableJson(v[k]);
+    }).join(',') + '}';
+  }
+  function sameState (a, b) { return stableJson(a) === stableJson(b); }
+
+  function normalizeItem (raw) {
+    var name = normalizeName(raw && raw.name);
+    if (!name) return null;
+    var added = num(raw && raw.addedAt, Date.now());
+    return {
+      id: (raw && raw.id) || uid(),
+      name: name,
+      qty: normalizeQty(raw && raw.qty),
+      checked: !!(raw && raw.checked),
+      addedBy: (raw && raw.addedBy) || null,
+      checkedBy: (raw && raw.checkedBy) || null,
+      addedAt: added,
+      updatedAt: num(raw && raw.updatedAt, added),
+      checkedAt: num(raw && raw.checkedAt, added)
+    };
+  }
+  function normalizeItems (items) {
+    var out = [];
     (items || []).forEach(function (raw) {
-      var name = normalizeName(raw && raw.name);
-      if (!name) return;
-      var item = {
-        id: (raw && raw.id) || uid(),
-        name: name,
-        qty: normalizeQty(raw && raw.qty),
-        checked: !!(raw && raw.checked),
-        addedBy: (raw && raw.addedBy) || null,
-        checkedBy: (raw && raw.checkedBy) || null,
-        addedAt: (raw && typeof raw.addedAt === 'number') ? raw.addedAt : Date.now()
-      };
-      var key = name.toLowerCase() + '|' + (item.checked ? '1' : '0');
-      if (map[key]) { map[key].qty += item.qty; }
-      else { map[key] = item; order.push(key); }
+      var it = normalizeItem(raw);
+      if (it) out.push(it);
     });
-    return order.map(function (k) { return map[k]; });
+    return out;
+  }
+
+  function emptyTombstones () { return { lists: {}, items: {}, recipes: {} }; }
+
+  function normalizeTombstones (raw) {
+    var out = emptyTombstones();
+    ['lists', 'items', 'recipes'].forEach(function (kind) {
+      var src = raw && raw[kind];
+      if (!src || typeof src !== 'object') return;
+      Object.keys(src).forEach(function (id) {
+        var ts = num(src[id], 0);
+        if (ts > 0) out[kind][id] = ts;
+      });
+    });
+    return out;
+  }
+  function mergeTombstones (a, b) {
+    var out = emptyTombstones();
+    ['lists', 'items', 'recipes'].forEach(function (kind) {
+      [a && a[kind], b && b[kind]].forEach(function (src) {
+        if (!src) return;
+        Object.keys(src).forEach(function (id) {
+          out[kind][id] = Math.max(out[kind][id] || 0, src[id]);
+        });
+      });
+    });
+    return out;
+  }
+  function pruneTombstones (tomb) {
+    var cutoff = Date.now() - TOMBSTONE_TTL;
+    var out = emptyTombstones();
+    ['lists', 'items', 'recipes'].forEach(function (kind) {
+      Object.keys(tomb[kind]).forEach(function (id) {
+        if (tomb[kind][id] >= cutoff) out[kind][id] = tomb[kind][id];
+      });
+    });
+    return out;
+  }
+  function tombstone (kind, id) {
+    if (!state.tombstones) state.tombstones = emptyTombstones();
+    state.tombstones[kind][id] = Date.now();
+  }
+
+  function byField (field) {
+    return function (a, b) {
+      if (a[field] !== b[field]) return a[field] - b[field];
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    };
+  }
+
+  /* To varer med samme navn (og samme avkrysset-status) i samme liste slås
+   * sammen til én rad, og antallet legges sammen – akkurat som når du skriver
+   * inn den samme varen to ganger selv. Den som ble lagt inn først beholdes,
+   * slik at begge telefoner ender på nøyaktig samme rad. */
+  function dedupeItems (items, tomb) {
+    var seen = {};
+    var out = [];
+    items.forEach(function (it) {
+      var key = it.name.toLowerCase() + '|' + (it.checked ? '1' : '0');
+      if (seen[key]) {
+        var keep = seen[key];
+        keep.qty = Math.min(999, keep.qty + it.qty);
+        keep.updatedAt = Math.max(keep.updatedAt, it.updatedAt);
+        tomb.items[it.id] = Math.max(tomb.items[it.id] || 0, Date.now());
+      } else {
+        seen[key] = it;
+        out.push(it);
+      }
+    });
+    return out;
+  }
+
+  /* Bringer en tilstand på normalform: slettede rader fjernet, fast
+   * rekkefølge, ingen duplikater. Kjøres etter hver sammenslåing, slik at
+   * begge telefonene får bitidentiske dokumenter når de er enige. */
+  function canonicalState (s) {
+    var tomb = pruneTombstones(s.tombstones || emptyTombstones());
+    var lists = s.lists
+      .filter(function (l) { return !tomb.lists[l.id]; })
+      .sort(byField('createdAt'))
+      .map(function (l) {
+        var items = l.items
+          .filter(function (i) { return !tomb.items[i.id]; })
+          .sort(byField('addedAt'));
+        return {
+          id: l.id,
+          name: l.name,
+          createdAt: l.createdAt,
+          updatedAt: l.updatedAt,
+          items: dedupeItems(items, tomb)
+        };
+      });
+    var recipes = s.recipes
+      .filter(function (r) { return !tomb.recipes[r.id]; })
+      .sort(byField('createdAt'));
+    return { lists: lists, recipes: recipes, tombstones: tomb };
+  }
+
+  /* Den aller første listen får en FAST id. Ellers ville de to telefonene laget
+   * hver sin «Handleliste» første gang de kobler seg til, og endt opp med å se
+   * på hver sin tomme fane i stedet for den samme listen. */
+  var DEFAULT_LIST_ID = 'liste-1';
+
+  function ensureAtLeastOneList (s) {
+    if (!s.lists.length) {
+      s.lists.push({ id: DEFAULT_LIST_ID, name: 'Handleliste', createdAt: 0, updatedAt: 0, items: [] });
+    }
+    return s;
+  }
+
+  /* Velger den siden som ble endret sist. Er tidsstemplene helt like, velger
+   * vi på en måte som gir samme resultat på begge telefoner. */
+  function pickNewer (a, b, field) {
+    if (a[field] > b[field]) return a;
+    if (b[field] > a[field]) return b;
+    return stableJson(a) >= stableJson(b) ? a : b;
+  }
+
+  function mergeById (mine, theirs, mergeOne) {
+    var byId = {};
+    var order = [];
+    mine.forEach(function (x) { byId[x.id] = x; order.push(x.id); });
+    theirs.forEach(function (y) {
+      if (byId[y.id]) byId[y.id] = mergeOne(byId[y.id], y);
+      else { byId[y.id] = y; order.push(y.id); }
+    });
+    return order.map(function (id) { return byId[id]; });
+  }
+
+  function mergeItems (a, b) {
+    /* Navn og antall følger siste endring; avkrysset følger sin egen klokke,
+     * slik at «han krysset av mens hun justerte antallet» beholder begge. */
+    var base = pickNewer(a, b, 'updatedAt');
+    var chk = pickNewer(a, b, 'checkedAt');
+    return {
+      id: a.id,
+      name: base.name,
+      qty: base.qty,
+      checked: chk.checked,
+      checkedBy: chk.checkedBy,
+      addedBy: a.addedBy || b.addedBy || null,
+      addedAt: Math.min(a.addedAt, b.addedAt),
+      updatedAt: Math.max(a.updatedAt, b.updatedAt),
+      checkedAt: Math.max(a.checkedAt, b.checkedAt)
+    };
+  }
+
+  function mergeLists (a, b) {
+    var base = pickNewer(a, b, 'updatedAt');
+    return {
+      id: a.id,
+      name: base.name,
+      createdAt: Math.min(a.createdAt, b.createdAt),
+      updatedAt: Math.max(a.updatedAt, b.updatedAt),
+      items: mergeById(a.items, b.items, mergeItems)
+    };
+  }
+
+  function mergeRecipes (a, b) {
+    var base = pickNewer(a, b, 'updatedAt');
+    return {
+      id: a.id,
+      name: base.name,
+      ingredients: base.ingredients,
+      createdAt: Math.min(a.createdAt, b.createdAt),
+      updatedAt: Math.max(a.updatedAt, b.updatedAt)
+    };
+  }
+
+  function mergeStates (mine, theirs) {
+    return ensureAtLeastOneList(canonicalState({
+      lists: mergeById(mine.lists, theirs.lists, mergeLists),
+      recipes: mergeById(mine.recipes, theirs.recipes, mergeRecipes),
+      tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
+    }));
   }
   function normalizeIngredients (raw) {
     if (!Array.isArray(raw)) return [];
@@ -371,35 +723,44 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       return { name: normalizeName(ing && ing.name), qty: normalizeQty(ing && ing.qty) };
     }).filter(function (ing) { return ing.name; });
   }
+  /* Leser inn en tilstand utenfra (skyen eller den lokale kopien) og gir alle
+   * rader tidsstempler. Gamle lister uten tidsstempler får dem her, slik at
+   * oppgraderingen skjer av seg selv – ingenting må gjøres på nytt. */
   function migrateState (raw) {
-    var lists;
-    if (raw && Array.isArray(raw.lists) && raw.lists.length) {
-      lists = raw.lists.map(function (l) {
+    var lists = [];
+    if (raw && Array.isArray(raw.lists)) {
+      lists = raw.lists.map(function (l, idx) {
         return {
           id: (l && l.id) || uid(),
           name: normalizeName(l && l.name) || 'Liste',
-          items: normalizeAndMergeItems(l && l.items)
+          createdAt: num(l && l.createdAt, idx + 1),
+          updatedAt: num(l && l.updatedAt, idx + 1),
+          items: normalizeItems(l && l.items)
         };
       });
     } else if (raw && Array.isArray(raw.items)) {
-      lists = [{ id: uid(), name: 'Handleliste', items: normalizeAndMergeItems(raw.items) }];
-    } else {
-      lists = [{ id: uid(), name: 'Handleliste', items: [] }];
+      lists = [{ id: uid(), name: 'Handleliste', createdAt: 1, updatedAt: 1, items: normalizeItems(raw.items) }];
     }
     var recipes = [];
     if (raw && Array.isArray(raw.recipes)) {
-      recipes = raw.recipes.map(function (r) {
+      recipes = raw.recipes.map(function (r, idx) {
         return {
           id: (r && r.id) || uid(),
           name: normalizeName(r && r.name) || 'Oppskrift',
-          ingredients: normalizeIngredients(r && r.ingredients)
+          ingredients: normalizeIngredients(r && r.ingredients),
+          createdAt: num(r && r.createdAt, idx + 1),
+          updatedAt: num(r && r.updatedAt, idx + 1)
         };
       }).filter(function (r) { return r.ingredients.length > 0; });
     }
-    return { lists: lists, recipes: recipes };
+    return canonicalState({
+      lists: lists,
+      recipes: recipes,
+      tombstones: normalizeTombstones(raw && raw.tombstones)
+    });
   }
 
-  var state = { lists: [{ id: uid(), name: 'Handleliste', items: [] }], recipes: [] };
+  var state = ensureAtLeastOneList({ lists: [], recipes: [], tombstones: emptyTombstones() });
   var activeListId = getStoredActiveListId();
 
   function ensureActiveList () {
@@ -423,10 +784,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   var fbApp = null, fbAuth = null, fbDb = null, fbDocRef = null, fbUnsubscribe = null;
+  var fbConfigJson = null, fbAppSeq = 0;
   var isWriter = false;
   var saveTimer = null;
   var pendingSave = false;
   var statusState = 'connecting';
+  /* Endringer gjort før/uten forbindelse. Når vi kommer på nett igjen skal DE
+   * vinne over det som ligger i skyen – ellers ville de blitt stille borte. */
+  var hasUnsyncedEdits = false;
+  var retryTimer = null;
   var draftName = '';
   var draftQty = 1;
   var currentView = 'lists';
@@ -466,15 +832,20 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   /* ============================== rendering ============================== */
 
+  var summaryEl = null;
+  var listSectionEl = null;
+  var footerRowEl = null;
+
   function render () {
     root.innerHTML = '';
     var list = getActiveList();
 
+    summaryEl = el('p', { text: itemsSummary(list) });
     var brand = el('div', { class: 'brand' }, [
       el('div', { class: 'brand-mark', html: ICON_CART }),
       el('div', {}, [
         el('h1', { text: 'Handleliste' }),
-        el('p', { text: itemsSummary(list) })
+        summaryEl
       ])
     ]);
 
@@ -495,23 +866,29 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     root.appendChild(status);
     root.appendChild(buildViewSwitch());
 
+    listSectionEl = null;
+    footerRowEl = null;
+
     if (currentView === 'recipes') {
       root.appendChild(buildRecipesView(list));
     } else {
       root.appendChild(buildTabsRow(list));
       root.appendChild(buildAddForm(list));
-      root.appendChild(buildList(list));
+
+      listSectionEl = buildList(list);
+      root.appendChild(listSectionEl);
 
       var checkedCount = list.items.filter(function (i) { return i.checked; }).length;
       if (checkedCount > 0) {
-        root.appendChild(el('div', { class: 'footer-row' }, [
+        footerRowEl = el('div', { class: 'footer-row' }, [
           el('button', { class: 'clear-btn', text: 'Tøm avkryssede (' + checkedCount + ')', onclick: function () { clearChecked(); } })
-        ]));
+        ]);
+        root.appendChild(footerRowEl);
       }
     }
 
     var hint = el('p', { class: 'hint' });
-    hint.appendChild(document.createTextNode('Listene oppdateres automatisk på begge telefoner. Legg til denne siden på hjemskjermen for rask tilgang. '));
+    hint.appendChild(document.createTextNode('Listene oppdateres automatisk på begge telefoner. Installer appen på hjemskjermen for å åpne den direkte – den virker også uten nett. '));
     var reconnectBtn = el('button', { class: 'link-btn', type: 'button', text: 'Endre tilkobling' });
     reconnectBtn.addEventListener('click', function () {
       showConfirmModal({
@@ -527,6 +904,35 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     root.appendChild(hint);
 
     if (!getName()) showNameModal(false);
+  }
+
+  // Patches just the item list (and the header count + "tøm avkryssede" footer) without
+  // touching the header, tabs or add-form. This is what keeps the add-form's text input
+  // (and, critically, the on-screen keyboard on a phone) alive across add/check/delete —
+  // a full render() replaces that input with a brand-new DOM node, and re-focusing a new
+  // node programmatically does not reliably reopen the keyboard on real phones.
+  function renderListOnly () {
+    if (currentView !== 'lists' || !listSectionEl || !listSectionEl.parentNode) { render(); return; }
+    var list = getActiveList();
+    if (summaryEl) summaryEl.textContent = itemsSummary(list);
+
+    var parent = listSectionEl.parentNode;
+    var newListSection = buildList(list);
+    parent.replaceChild(newListSection, listSectionEl);
+    listSectionEl = newListSection;
+
+    if (footerRowEl && footerRowEl.parentNode) {
+      footerRowEl.parentNode.removeChild(footerRowEl);
+      footerRowEl = null;
+    }
+    var checkedCount = list.items.filter(function (i) { return i.checked; }).length;
+    if (checkedCount > 0) {
+      footerRowEl = el('div', { class: 'footer-row' }, [
+        el('button', { class: 'clear-btn', text: 'Tøm avkryssede (' + checkedCount + ')', onclick: function () { clearChecked(); } })
+      ]);
+      if (listSectionEl.nextSibling) parent.insertBefore(footerRowEl, listSectionEl.nextSibling);
+      else parent.appendChild(footerRowEl);
+    }
   }
 
   function buildViewSwitch () {
@@ -549,6 +955,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       case 'connecting': return 'Kobler til …';
       case 'saving': return 'Lagrer …';
       case 'saved': return 'Lagret – synkronisert';
+      case 'offline': return 'Frakoblet – viser sist lagrede liste';
+      case 'pending': return 'Frakoblet – endringene sendes når nettet er tilbake';
       case 'error': return 'Mistet kontakt – prøver igjen …';
       default: return 'Klar';
     }
@@ -609,9 +1017,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       var qtyToAdd = draftQty;
       draftName = '';
       draftQty = 1;
+      // Clear the SAME input node in place instead of letting a re-render replace it —
+      // addItem() below only patches the list section now, so this node (and the phone's
+      // on-screen keyboard) never loses focus.
+      nameInput.value = '';
+      qtyValue.textContent = '1';
+      syncMinus();
       addItem(list.id, nameToAdd, qtyToAdd);
-      var freshInput = root.querySelector('input[name="itemName"]');
-      if (freshInput) freshInput.focus();
+      nameInput.focus();
     });
     return form;
   }
@@ -644,7 +1057,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   function buildItem (list, item) {
     var meta = '';
-    if (item.checked && item.checkedBy) meta = 'Krysset av av ' + item.checkedBy;
+    if (item.checked && item.checkedBy) meta = 'Krysset av ' + item.checkedBy;
     else if (item.addedBy) meta = 'Lagt til av ' + item.addedBy;
 
     var body = el('div', { class: 'item-body' }, [
@@ -911,7 +1324,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function addList (name) {
     name = normalizeName(name);
     if (!name) return;
-    var list = { id: uid(), name: name, items: [] };
+    var now = Date.now();
+    var list = { id: uid(), name: name, createdAt: now, updatedAt: now, items: [] };
     state.lists.push(list);
     activeListId = list.id;
     setStoredActiveListId(list.id);
@@ -928,12 +1342,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     state.lists.forEach(function (l) { if (l.id === id) list = l; });
     if (!list) return;
     list.name = name;
+    list.updatedAt = Date.now();
     render();
     scheduleSave();
   }
 
   function deleteList (id) {
     if (state.lists.length <= 1) return;
+    tombstone('lists', id);
     state.lists = state.lists.filter(function (l) { return l.id !== id; });
     if (activeListId === id) {
       activeListId = state.lists[0].id;
@@ -960,8 +1376,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       var it = list.items[i];
       if (!it.checked && it.name.toLowerCase() === name.toLowerCase()) { match = it; break; }
     }
+    var now = Date.now();
     if (match) {
-      match.qty += qty;
+      match.qty = Math.min(999, match.qty + qty);
+      match.updatedAt = now;
     } else {
       list.items.push({
         id: uid(),
@@ -970,7 +1388,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         checked: false,
         addedBy: adder || null,
         checkedBy: null,
-        addedAt: Date.now()
+        addedAt: now,
+        updatedAt: now,
+        checkedAt: now
       });
     }
   }
@@ -979,7 +1399,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var list = findList(listId);
     if (!list) return;
     mergeItemIntoList(list, name, qty, getName());
-    render();
+    renderListOnly();
     scheduleSave();
   }
 
@@ -991,7 +1411,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!item) return;
     item.checked = !item.checked;
     item.checkedBy = item.checked ? (getName() || null) : null;
-    render();
+    item.checkedAt = Date.now();
+    renderListOnly();
     scheduleSave();
   }
 
@@ -1006,22 +1427,25 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (next > 999) next = 999;
     if (next === item.qty) return;
     item.qty = next;
-    render();
+    item.updatedAt = Date.now();
+    renderListOnly();
     scheduleSave();
   }
 
   function deleteItem (listId, itemId) {
     var list = findList(listId);
     if (!list) return;
+    tombstone('items', itemId);
     list.items = list.items.filter(function (i) { return i.id !== itemId; });
-    render();
+    renderListOnly();
     scheduleSave();
   }
 
   function clearChecked () {
     var list = getActiveList();
+    list.items.forEach(function (i) { if (i.checked) tombstone('items', i.id); });
     list.items = list.items.filter(function (i) { return !i.checked; });
-    render();
+    renderListOnly();
     scheduleSave();
   }
 
@@ -1034,7 +1458,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   function addRecipe (name, ingredients) {
-    state.recipes.push({ id: uid(), name: name, ingredients: ingredients });
+    var now = Date.now();
+    state.recipes.push({ id: uid(), name: name, ingredients: ingredients, createdAt: now, updatedAt: now });
     render();
     scheduleSave();
   }
@@ -1044,11 +1469,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!recipe) return;
     recipe.name = name;
     recipe.ingredients = ingredients;
+    recipe.updatedAt = Date.now();
     render();
     scheduleSave();
   }
 
   function deleteRecipe (id) {
+    tombstone('recipes', id);
     state.recipes = state.recipes.filter(function (r) { return r.id !== id; });
     render();
     scheduleSave();
@@ -1072,7 +1499,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   function scheduleSave () {
-    if (!isWriter) return;
+    /* Uten forbindelse kan vi ikke lagre til Firebase, men vi tar vare på
+     * endringen lokalt og sender den så snart vi er tilkoblet igjen. */
+    if (!isWriter) {
+      hasUnsyncedEdits = true;
+      setCachedState(state);
+      setStatus('pending');
+      return;
+    }
     pendingSave = true;
     setStatus('saving');
     clearTimeout(saveTimer);
@@ -1083,6 +1517,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!isWriter || !fbDocRef) return;
     pendingSave = false;
     setDoc(fbDocRef, state).then(function () {
+      hasUnsyncedEdits = false;
+      setCachedState(state);
       setStatus('saved');
     }).catch(function () {
       setStatus('error');
@@ -1093,13 +1529,32 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function startListening () {
     isWriter = true;
     fbUnsubscribe = onSnapshot(fbDocRef, function (snap) {
-      var raw = snap.exists() ? snap.data() : { lists: [], recipes: [] };
-      var rawJson = JSON.stringify(raw);
-      state = migrateState(raw);
+      /* Vi FLETTER skyens versjon med vår egen i stedet for å la den ene
+       * overskrive den andre. Da overlever både det den andre telefonen har
+       * gjort og det vi selv rakk å gjøre uten nett. */
+      var remote = migrateState(snap.exists() ? snap.data() : null);
+      // If only item contents changed (the common case — you or your partner adding/
+      // checking/removing items), patch just the list section so a remote update never
+      // steals focus out of whatever you're typing. A structural change (list added/
+      // renamed/deleted/reordered, or a recipe change) still gets a full render().
+      var prevListShape = state.lists.map(function (l) { return l.id + ':' + l.name; }).join('|');
+      var prevRecipesJson = stableJson(state.recipes);
+      state = mergeStates(state, remote);
+      hasUnsyncedEdits = false;
       ensureActiveList();
+      setCachedState(state);
       setStatus('saved');
-      render();
-      if (!snap.exists() || JSON.stringify(state) !== rawJson) scheduleSave();
+      var newListShape = state.lists.map(function (l) { return l.id + ':' + l.name; }).join('|');
+      var recipesChanged = stableJson(state.recipes) !== prevRecipesJson;
+      if (currentView === 'lists' && newListShape === prevListShape && !recipesChanged) {
+        renderListOnly();
+      } else {
+        render();
+      }
+      /* Ga sammenslåingen noe annet enn det som lå i skyen – typisk fordi vi
+       * hadde endringer den ikke kjente til – sender vi resultatet tilbake, så
+       * begge telefoner ender på nøyaktig samme liste. */
+      if (!snap.exists() || !sameState(state, remote)) scheduleSave();
     }, function () {
       setStatus('error');
     });
@@ -1107,10 +1562,22 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   function connectFirebase (cfg, onError) {
     try {
-      fbApp = initializeApp(cfg);
-      fbAuth = getAuth(fbApp);
-      fbDb = getFirestore(fbApp);
-      fbDocRef = doc(fbDb, DOC_COLLECTION, DOC_ID);
+      /* Ved gjentatte forsøk med SAMME oppsett (f.eks. etter at nettet falt ut)
+       * gjenbruker vi app-instansen. Endrer oppsettet seg – typisk at man limer
+       * inn en ny konfigurasjon – må vi lage en ny, ellers ville vi fortsatt
+       * snakket med det gamle prosjektet. Navngitte app-instanser gjør at
+       * Firebase ikke klager på at den initialiseres flere ganger. */
+      var cfgJson = JSON.stringify(cfg);
+      if (fbApp && fbConfigJson !== cfgJson) {
+        fbApp = null; fbAuth = null; fbDb = null; fbDocRef = null;
+      }
+      if (!fbApp) {
+        fbApp = initializeApp(cfg, 'handleliste-' + (++fbAppSeq));
+        fbAuth = getAuth(fbApp);
+        fbDb = getFirestore(fbApp);
+        fbDocRef = doc(fbDb, DOC_COLLECTION, DOC_ID);
+        fbConfigJson = cfgJson;
+      }
     } catch (e) {
       onError('Klarte ikke å tolke konfigurasjonen. Sjekk at du limte inn hele firebaseConfig-blokken.');
       return;
@@ -1124,22 +1591,33 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     }).catch(function (err) {
       var code = err && err.code;
       var msg = 'Klarte ikke å koble til Firebase. Sjekk konfigurasjonen og internettforbindelsen.';
+      /* Er det oppsettet som er galt, eller er vi bare uten nett akkurat nå?
+       * Bare det første skal føre til at vi ber om konfigurasjonen på nytt. */
+      var configProblem = true;
       if (code === 'auth/operation-not-allowed') {
         msg = 'Anonym innlogging er ikke slått på i Firebase-prosjektet. Gå til Authentication → Sign-in method og slå på «Anonymous».';
       } else if (code === 'permission-denied' || code === 'firestore/permission-denied') {
         msg = 'Firebase avviste tilgangen. Sjekk sikkerhetsreglene for Firestore.';
       } else if (code === 'auth/invalid-api-key' || code === 'auth/api-key-not-valid') {
         msg = 'API-nøkkelen ser ikke riktig ut. Sjekk at du kopierte hele konfigurasjonen.';
+      } else if (code === 'auth/network-request-failed' || code === 'unavailable' ||
+                 code === 'firestore/unavailable' || code === 'deadline-exceeded' ||
+                 !navigator.onLine) {
+        msg = 'Får ikke kontakt med Firebase. Sjekk internettforbindelsen.';
+        configProblem = false;
       }
-      onError(msg);
+      onError(msg, configProblem);
     });
   }
 
   function reconnect () {
     if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+    clearTimeout(retryTimer);
     clearStoredFirebaseConfig();
-    fbApp = null; fbAuth = null; fbDb = null; fbDocRef = null;
+    clearCachedState();
+    fbApp = null; fbAuth = null; fbDb = null; fbDocRef = null; fbConfigJson = null;
     isWriter = false;
+    hasUnsyncedEdits = false;
     renderSetupGate();
   }
 
@@ -1177,13 +1655,47 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   injectStyles();
   var storedCfg = getStoredFirebaseConfig();
+
   if (storedCfg) {
-    root.appendChild(el('div', { class: 'setup-screen' }, [
-      el('div', { class: 'empty-state' }, [ el('h3', { text: 'Kobler til …' }), el('p', { text: 'Henter den delte listen din.' }) ])
-    ]));
-    connectFirebase(storedCfg, function (msg) {
-      clearStoredFirebaseConfig();
-      renderSetupGate(msg);
+    /* Er appen brukt før på denne telefonen, viser vi den lagrede listen med én
+     * gang – appen åpner uten venting, og fungerer også helt uten nett. */
+    var cached = getCachedState();
+    if (cached) {
+      state = ensureAtLeastOneList(migrateState(cached));
+      ensureActiveList();
+      statusState = navigator.onLine ? 'connecting' : 'offline';
+      render();
+    } else {
+      root.appendChild(el('div', { class: 'setup-screen' }, [
+        el('div', { class: 'empty-state' }, [ el('h3', { text: 'Kobler til …' }), el('p', { text: 'Henter den delte listen din.' }) ])
+      ]));
+    }
+
+    var tryConnect = function () {
+      connectFirebase(storedCfg, function (msg, configProblem) {
+        if (configProblem) {
+          /* Oppsettet er faktisk feil – da må vi spørre om konfigurasjonen igjen. */
+          clearStoredFirebaseConfig();
+          clearCachedState();
+          renderSetupGate(msg);
+          return;
+        }
+        /* Bare uten nett: behold oppsettet, vis den lagrede listen, prøv igjen. */
+        if (!cached) {
+          state = ensureAtLeastOneList(migrateState(getCachedState() || state));
+          ensureActiveList();
+        }
+        setStatus(hasUnsyncedEdits ? 'pending' : 'offline');
+        if (!document.querySelector('.status-row')) render();
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(tryConnect, 15000);
+      });
+    };
+
+    tryConnect();
+    /* Kommer nettet tilbake, kobler vi til igjen med én gang. */
+    window.addEventListener('online', function () {
+      if (!isWriter) { clearTimeout(retryTimer); tryConnect(); }
     });
   } else {
     renderSetupGate();
