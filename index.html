@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '180920261449';
+  var APP_VERSION = '180920261512';
 
   /* ============================== styling ============================== */
 
@@ -429,6 +429,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  background:var(--accent-soft);color:var(--accent);',
     '}',
     '.die-badge:active{background:var(--accent);color:var(--accent-ink);}',
+    /* Tom terning: ingen karakter gitt ennå, men fortsatt en knapp. */
+    '.die-badge.is-empty{background:transparent;border-color:var(--line);color:var(--muted);}',
+    '.die-badge.is-empty:active{background:var(--surface-2);color:var(--ink-soft);}',
+    '.modal.reader h2 .die-badge{vertical-align:-6px;}',
     '.modal .die-row{margin-top:4px;}',
     '.die-block{margin:14px 0 4px;}',
 
@@ -1599,11 +1603,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   /* Det lille vinduet du får når du trykker på terningen på oppskriftskortet. */
-  function showRatingModal (recipe) {
+  function showRatingModal (recipe, onDone) {
     closeOverlay();
-    var row = buildDieRow(recipe.id, function () { closeOverlay(); });
+    var row = buildDieRow(recipe.id, function () {
+      closeOverlay();
+      /* Åpnet du skalaen inne fra oppskriften, skal du tilbake dit etterpå. */
+      if (onDone) onDone();
+    });
     var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
-    closeBtn.addEventListener('click', closeOverlay);
+    closeBtn.addEventListener('click', function () { closeOverlay(); if (onDone) onDone(); });
 
     var modal = el('div', { class: 'modal' }, [
       el('h2', { text: 'Terningkast' }),
@@ -1621,20 +1629,33 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function showRecipeReader (recipe) {
     closeOverlay();
 
-    var kids = [el('h2', { text: recipe.name })];
+    /* Terningen står ved siden av navnet, og er eneste inngang til skalaen.
+     * Har oppskriften ingen karakter ennå, vises en tom terning – ellers
+     * hadde det ikke vært noen vei inn til å gi den. */
+    var titleEl = el('h2', { text: recipe.name });
+    var rated = recipe.rating;
+    var readerDie = el('button', {
+      type: 'button', class: 'die-badge' + (rated ? '' : ' is-empty'),
+      html: dieSvg(rated || 0, 18),
+      'aria-label': rated ? ('Terningkast ' + rated + ' – trykk for å endre') : 'Gi terningkast'
+    });
+    readerDie.addEventListener('click', function () {
+      showRatingModal(recipe, function () { showRecipeReader(recipe); });
+    });
+    titleEl.appendChild(readerDie);
+
+    var kids = [titleEl];
 
     /* Glideren skalerer mengdene. Den endrer ikke selve oppskriften – den
      * står igjen som den er neste gang du åpner den. */
     var factor = 1;
-    var steps = [];
-    if (recipe.portions) {
-      var top = Math.max(12, recipe.portions * 2);
-      for (var p = 1; p <= top; p++) steps.push({ value: p, factor: p / recipe.portions, label: p + (p === 1 ? ' porsjon' : ' porsjoner') });
-    } else {
-      [0.5, 1, 1.5, 2, 2.5, 3, 4].forEach(function (f) {
-        steps.push({ value: f, factor: f, label: '× ' + formatNum(f) });
-      });
-    }
+    var steps = [0.25, 0.5, 1, 2, 3, 4].map(function (f) {
+      /* Har oppskriften porsjoner, viser vi hva ganget antall blir – det er
+       * lettere å forholde seg til enn et gangetall alene. */
+      var label = '× ' + formatNum(f);
+      if (recipe.portions) label += ' · ' + formatNum(recipe.portions * f) + ' porsjoner';
+      return { factor: f, label: label };
+    });
     var startIndex = 0;
     steps.forEach(function (s, i) { if (s.factor === 1) startIndex = i; });
 
@@ -1656,11 +1677,6 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     } else if (recipe.portions) {
       kids.push(el('div', { class: 'reader-portions', text: recipe.portions + ' porsjoner' }));
     }
-
-    kids.push(el('div', { class: 'die-block' }, [
-      el('span', { class: 'field-label', text: 'Terningkast' }),
-      buildDieRow(recipe.id)
-    ]));
 
     var ul = null;
     function paintIngredients () {
