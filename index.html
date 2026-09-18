@@ -323,10 +323,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.overlay{',
     '  position:fixed; inset:0; background:rgba(18,24,16,.55); display:flex; align-items:center; justify-content:center;',
     '  padding:20px; z-index:20;',
+    '  padding-top:calc(20px + env(safe-area-inset-top));',
+    '  padding-bottom:calc(20px + env(safe-area-inset-bottom));',
     '}',
     '.modal{',
     '  background:var(--surface); border-radius:var(--radius-lg); padding:22px; width:100%; max-width:340px;',
     '  box-shadow:var(--shadow); text-align:center;',
+    /* En lang oppskrift skal kunne rulles, ikke renne ut av skjermen. */
+    '  max-height:100%; overflow-y:auto; overscroll-behavior:contain;',
     '}',
     '.modal h2{font-size:19px;margin-bottom:6px;}',
     '.modal p{font-size:13.5px;color:var(--muted);margin:0 0 16px;line-height:1.5;}',
@@ -375,6 +379,63 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  padding:11px 12px; font-size:15px; font-family:inherit; margin-bottom:14px;',
     '}',
     '.recipe-name-input:focus{outline:2px solid var(--accent); outline-offset:1px;}',
+
+    /* --- oppskrift: kort, lesevisning, editor og import --- */
+    '.recipe-toolbar{display:flex;gap:8px;margin-bottom:12px;}',
+    '.recipe-toolbar .add-recipe-btn{flex:1;margin:0;}',
+    '.import-recipe-btn{',
+    '  flex:none;padding:11px 16px;border-radius:var(--radius-md);cursor:pointer;',
+    '  border:1px dashed var(--line);background:transparent;color:var(--ink-soft);',
+    '  font-family:inherit;font-size:14px;font-weight:600;',
+    '}',
+    '.import-recipe-btn:active{background:var(--surface-2);}',
+    '.recipe-open{',
+    '  display:block;width:100%;text-align:left;border:0;background:transparent;',
+    '  padding:0;margin:0 0 12px;cursor:pointer;font:inherit;color:inherit;',
+    '}',
+    '.recipe-facts{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
+    '.recipe-open .recipe-ing-preview{margin:0;}',
+    '.recipe-open-hint{display:inline-block;margin-top:6px;font-size:13px;font-weight:600;color:var(--accent);}',
+    '.recipe-open:active .recipe-open-hint{opacity:.6;}',
+
+    '.modal.reader h2{margin-bottom:2px;}',
+    '.reader-portions{font-size:13px;color:var(--muted);margin-bottom:14px;}',
+    '.reader-heading{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px;}',
+    '.reader-ingredients{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}',
+    '.reader-ingredients li{display:flex;gap:10px;font-size:15px;line-height:1.45;}',
+    '.reader-amount{flex:none;min-width:62px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;}',
+    '.reader-ing-name{color:var(--ink);}',
+    '.reader-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;}',
+    '.reader-steps li{font-size:15px;line-height:1.55;color:var(--ink-soft);padding-left:4px;}',
+    '.reader-steps li::marker{color:var(--accent);font-weight:700;}',
+    '.modal.reader .modal-actions{margin-top:22px;}',
+
+    '.field-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}',
+    '.field-label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px;}',
+    '.field-row .field-label{margin:0;flex:none;}',
+    '.field-hint{display:block;font-size:12px;color:var(--muted);margin-top:6px;}',
+    '.portions-input{',
+    '  width:72px;padding:9px 10px;border-radius:var(--radius-sm);border:1px solid var(--line);',
+    '  background:var(--surface);color:var(--ink);font-family:inherit;font-size:15px;',
+    '}',
+    '.ingredient-fields{display:flex;gap:6px;flex:1;min-width:0;}',
+    '.ingredient-fields .amount-field{flex:0 0 84px;min-width:0;}',
+    '.ingredient-fields input:last-child{flex:1;min-width:0;}',
+    '.steps-block{margin-top:16px;}',
+    '.steps-field,.import-field{',
+    '  width:100%;padding:11px 12px;border-radius:var(--radius-md);border:1px solid var(--line);',
+    '  background:var(--surface);color:var(--ink);font-family:inherit;font-size:15px;line-height:1.5;',
+    '  resize:vertical;',
+    '}',
+    '.steps-field:focus,.import-field:focus{outline:2px solid var(--accent);outline-offset:1px;}',
+    '.import-summary{display:flex;flex-direction:column;gap:8px;margin-top:12px;}',
+    '.import-item{',
+    '  display:flex;flex-direction:column;gap:2px;padding:10px 12px;',
+    '  border-radius:var(--radius-sm);background:var(--surface-2);',
+    '}',
+    '.import-item strong{font-size:14.5px;}',
+    '.import-facts{font-size:12px;color:var(--accent);font-weight:600;}',
+    '.import-preview{font-size:12.5px;color:var(--muted);line-height:1.45;}',
     '.ingredient-rows{display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto;margin-bottom:10px;padding-right:2px;}',
     '.ingredient-row{display:flex;align-items:center;gap:6px;}',
     '.ingredient-row input[type="text"]{',
@@ -704,7 +765,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return {
       id: a.id,
       name: base.name,
+      portions: base.portions,
       ingredients: base.ingredients,
+      steps: base.steps,
       createdAt: Math.min(a.createdAt, b.createdAt),
       updatedAt: Math.max(a.updatedAt, b.updatedAt)
     };
@@ -717,11 +780,45 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
     }));
   }
+  /* En ingrediens har både et antall (2 egg) og en fritekst-mengde (500 g).
+   * Mengden er fritekst med vilje – håndskrevne oppskrifter bruker alt fra
+   * «1 ss» til «en neve», og det skal ikke måtte presses inn i et tall. */
   function normalizeIngredients (raw) {
     if (!Array.isArray(raw)) return [];
     return raw.map(function (ing) {
-      return { name: normalizeName(ing && ing.name), qty: normalizeQty(ing && ing.qty) };
+      return {
+        name: normalizeName(ing && ing.name),
+        qty: normalizeQty(ing && ing.qty),
+        amount: normalizeName(ing && ing.amount).slice(0, 40)
+      };
     }).filter(function (ing) { return ing.name; });
+  }
+  function normalizeSteps (raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(function (s) {
+      return (s || '').toString().trim().replace(/\s+/g, ' ').slice(0, 600);
+    }).filter(function (s) { return s; });
+  }
+  function normalizePortions (raw) {
+    if (typeof raw === 'number' && isFinite(raw) && raw >= 1) return Math.min(99, Math.round(raw));
+    if (typeof raw === 'string') {
+      var m = raw.match(/\d+/);
+      if (m) { var n = parseInt(m[0], 10); if (n >= 1) return Math.min(99, n); }
+    }
+    return null;
+  }
+
+  /* Ingrediensen slik den skal se ut på handlelisten: mengden henger med i
+   * navnet, ellers står du i butikken med «kjøttdeig» og husker ikke hvor mye. */
+  function ingredientShoppingName (ing) {
+    return ing.amount ? ing.name + ' (' + ing.amount + ')' : ing.name;
+  }
+  function ingredientLabel (ing) {
+    var parts = [];
+    if (ing.amount) parts.push(ing.amount);
+    else if (ing.qty > 1) parts.push(String(ing.qty));
+    parts.push(ing.name);
+    return parts.join(' ');
   }
   /* Leser inn en tilstand utenfra (skyen eller den lokale kopien) og gir alle
    * rader tidsstempler. Gamle lister uten tidsstempler får dem her, slik at
@@ -747,11 +844,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         return {
           id: (r && r.id) || uid(),
           name: normalizeName(r && r.name) || 'Oppskrift',
+          portions: normalizePortions(r && r.portions),
           ingredients: normalizeIngredients(r && r.ingredients),
+          steps: normalizeSteps(r && r.steps),
           createdAt: num(r && r.createdAt, idx + 1),
           updatedAt: num(r && r.updatedAt, idx + 1)
         };
-      }).filter(function (r) { return r.ingredients.length > 0; });
+      }).filter(function (r) { return r.ingredients.length > 0 || r.steps.length > 0; });
     }
     return canonicalState({
       lists: lists,
@@ -1094,12 +1193,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
     var addRecipeBtn = el('button', { type: 'button', class: 'add-recipe-btn', text: '+ Ny oppskrift' });
     addRecipeBtn.addEventListener('click', function () { showRecipeEditor(null); });
-    section.appendChild(addRecipeBtn);
+    var importBtn = el('button', { type: 'button', class: 'import-recipe-btn', text: 'Importer' });
+    importBtn.addEventListener('click', function () { showRecipeImport(); });
+    section.appendChild(el('div', { class: 'recipe-toolbar' }, [addRecipeBtn, importBtn]));
 
     if (state.recipes.length === 0) {
       section.appendChild(el('div', { class: 'empty-state' }, [
         el('h3', { text: 'Ingen oppskrifter ennå' }),
-        el('p', { text: 'Opprett din første oppskrift, så kan dere legge alle ingrediensene i handlelisten med ett trykk.' })
+        el('p', { text: 'Opprett din første oppskrift, eller lim inn flere på én gang med «Importer».' })
       ]));
       return section;
     }
@@ -1121,14 +1222,67 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       el('div', { class: 'recipe-card-actions' }, [editBtn, delBtn])
     ]);
 
-    var preview = recipe.ingredients.map(function (i) {
-      return i.qty > 1 ? (i.name + ' (' + i.qty + ')') : i.name;
-    }).join(', ');
+    var preview = recipe.ingredients.map(ingredientLabel).join(', ');
+
+    var facts = [];
+    if (recipe.portions) facts.push(recipe.portions + ' porsjoner');
+    if (recipe.steps.length) facts.push(recipe.steps.length + ' steg');
 
     var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
     addBtn.addEventListener('click', function () { applyRecipeToActiveList(recipe); });
 
-    return el('div', { class: 'recipe-card' }, [head, el('p', { class: 'recipe-ing-preview', text: preview }), addBtn]);
+    var body = el('button', { type: 'button', class: 'recipe-open' }, [
+      facts.length ? el('div', { class: 'recipe-facts', text: facts.join(' · ') }) : null,
+      el('p', { class: 'recipe-ing-preview', text: preview || 'Ingen ingredienser' }),
+      recipe.steps.length ? el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' }) : null
+    ]);
+    body.addEventListener('click', function () { showRecipeReader(recipe); });
+
+    return el('div', { class: 'recipe-card' }, [head, body, addBtn]);
+  }
+
+  /* Hele oppskriften i lesbar form – det er denne som gjør at de håndskrevne
+   * arkene kan bli liggende i skuffen. */
+  function showRecipeReader (recipe) {
+    closeOverlay();
+
+    var kids = [el('h2', { text: recipe.name })];
+    if (recipe.portions) kids.push(el('div', { class: 'reader-portions', text: recipe.portions + ' porsjoner' }));
+
+    if (recipe.ingredients.length) {
+      kids.push(el('h3', { class: 'reader-heading', text: 'Ingredienser' }));
+      var ul = el('ul', { class: 'reader-ingredients' });
+      recipe.ingredients.forEach(function (ing) {
+        var amount = ing.amount || (ing.qty > 1 ? String(ing.qty) : '');
+        ul.appendChild(el('li', {}, [
+          el('span', { class: 'reader-amount', text: amount }),
+          el('span', { class: 'reader-ing-name', text: ing.name })
+        ]));
+      });
+      kids.push(ul);
+    }
+
+    if (recipe.steps.length) {
+      kids.push(el('h3', { class: 'reader-heading', text: 'Fremgangsmåte' }));
+      var ol = el('ol', { class: 'reader-steps' });
+      recipe.steps.forEach(function (s) { ol.appendChild(el('li', { text: s })); });
+      kids.push(ol);
+    }
+
+    var addBtn = el('button', { class: 'primary', type: 'button', text: 'Legg i handlelisten' });
+    addBtn.addEventListener('click', function () { closeOverlay(); applyRecipeToActiveList(recipe); });
+    var editBtn = el('button', { class: 'secondary', type: 'button', text: 'Rediger' });
+    editBtn.addEventListener('click', function () { showRecipeEditor(recipe); });
+    var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
+    closeBtn.addEventListener('click', closeOverlay);
+
+    if (recipe.ingredients.length) kids.push(el('div', { class: 'modal-actions' }, [editBtn, addBtn]));
+    else kids.push(el('div', { class: 'modal-actions' }, [closeBtn, editBtn]));
+
+    var modal = el('div', { class: 'modal wide reader' }, kids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
   }
 
   /* ============================== modals ============================== */
@@ -1230,17 +1384,29 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     closeOverlay();
     var draft = {
       name: existing ? existing.name : '',
+      portions: existing && existing.portions ? String(existing.portions) : '',
+      steps: existing && existing.steps.length ? existing.steps.join('\n') : '',
       ingredients: existing && existing.ingredients.length
-        ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty }; })
-        : [{ name: '', qty: 1 }]
+        ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty, amount: i.amount || '' }; })
+        : [{ name: '', qty: 1, amount: '' }]
     };
 
     var nameInput = el('input', { type: 'text', class: 'recipe-name-input', placeholder: 'F.eks. Tacogryte', maxlength: '60', value: draft.name });
     nameInput.addEventListener('input', function () { draft.name = nameInput.value; });
 
+    var portionsInput = el('input', { type: 'number', class: 'portions-input', placeholder: '4', min: '1', max: '99', value: draft.portions });
+    portionsInput.addEventListener('input', function () { draft.portions = portionsInput.value; });
+    var portionsRow = el('label', { class: 'field-row' }, [
+      el('span', { class: 'field-label', text: 'Porsjoner' }),
+      portionsInput
+    ]);
+
     var rowsContainer = el('div', { class: 'ingredient-rows' });
 
     function buildIngredientRow (ing, idx) {
+      var amountField = el('input', { type: 'text', class: 'amount-field', placeholder: 'Mengde', maxlength: '40', value: ing.amount });
+      amountField.addEventListener('input', function () { ing.amount = amountField.value; });
+
       var nameField = el('input', { type: 'text', placeholder: 'Ingrediens', maxlength: '60', value: ing.name });
       nameField.addEventListener('input', function () { ing.name = nameField.value; });
 
@@ -1260,6 +1426,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         if (draft.ingredients.length <= 1) {
           ing.name = '';
           ing.qty = 1;
+          ing.amount = '';
           renderRows();
           return;
         }
@@ -1267,7 +1434,11 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         renderRows();
       });
 
-      return el('div', { class: 'ingredient-row' }, [nameField, stepper, removeBtn]);
+      return el('div', { class: 'ingredient-row' }, [
+        el('div', { class: 'ingredient-fields' }, [amountField, nameField]),
+        stepper,
+        removeBtn
+      ]);
     }
 
     function renderRows () {
@@ -1279,23 +1450,49 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     renderRows();
 
     var addIngBtn = el('button', { type: 'button', class: 'add-ingredient-btn', text: '+ Legg til ingrediens' });
-    addIngBtn.addEventListener('click', function () { draft.ingredients.push({ name: '', qty: 1 }); renderRows(); });
+    addIngBtn.addEventListener('click', function () { draft.ingredients.push({ name: '', qty: 1, amount: '' }); renderRows(); });
+
+    var stepsField = el('textarea', {
+      class: 'steps-field',
+      rows: '6',
+      placeholder: 'Ett steg per linje:\nBland kjøttdeig med salt og pepper.\nTilsett egg og melk, og la stå i 10 minutter.'
+    });
+    stepsField.value = draft.steps;
+    stepsField.addEventListener('input', function () { draft.steps = stepsField.value; });
+    var stepsBlock = el('div', { class: 'steps-block' }, [
+      el('span', { class: 'field-label', text: 'Fremgangsmåte' }),
+      stepsField,
+      el('span', { class: 'field-hint', text: 'Én linje blir ett steg. Nummerering legges til automatisk.' })
+    ]);
 
     var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
     cancelBtn.addEventListener('click', closeOverlay);
     var saveBtn = el('button', { class: 'primary', type: 'submit', text: existing ? 'Lagre endringer' : 'Opprett oppskrift' });
     var actions = el('div', { class: 'modal-actions' }, [cancelBtn, saveBtn]);
 
-    var form = el('form', {}, [nameInput, rowsContainer, addIngBtn, actions]);
+    var form = el('form', {}, [
+      nameInput, portionsRow,
+      el('span', { class: 'field-label', text: 'Ingredienser' }),
+      rowsContainer, addIngBtn,
+      stepsBlock,
+      actions
+    ]);
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var name = draft.name.trim();
       if (!name) { nameInput.focus(); return; }
-      var validIngredients = normalizeIngredients(draft.ingredients);
-      if (!validIngredients.length) return;
+      var data = {
+        name: name,
+        portions: draft.portions,
+        ingredients: draft.ingredients,
+        steps: draft.steps.split('\n')
+      };
+      /* En oppskrift må ha enten ingredienser eller en fremgangsmåte – ellers
+       * er det ingenting der. */
+      if (!normalizeIngredients(data.ingredients).length && !normalizeSteps(data.steps).length) return;
       closeOverlay();
-      if (existing) updateRecipe(existing.id, name, validIngredients);
-      else addRecipe(name, validIngredients);
+      if (existing) updateRecipe(existing.id, data);
+      else addRecipe(data);
     });
 
     var modal = el('div', { class: 'modal wide' }, [
@@ -1306,6 +1503,81 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
     document.body.appendChild(overlay);
     setTimeout(function () { nameInput.focus(); }, 30);
+  }
+
+  function showRecipeImport () {
+    closeOverlay();
+
+    var field = el('textarea', {
+      class: 'import-field',
+      rows: '10',
+      placeholder: '# Kjøttkaker\nPorsjoner: 4\n\nIngredienser:\n- 500 g kjøttdeig\n- 2 egg\n- 1 dl melk\n\nFremgangsmåte:\n1. Bland kjøttdeig med salt og pepper.\n2. Tilsett egg og melk.'
+    });
+
+    var summary = el('div', { class: 'import-summary' });
+    var confirmBtn = el('button', { class: 'primary', type: 'button', text: 'Legg inn', disabled: true });
+    var parsed = [];
+
+    function refresh () {
+      parsed = parseRecipeText(field.value);
+      summary.innerHTML = '';
+      if (!field.value.trim()) {
+        confirmBtn.disabled = true;
+        return;
+      }
+      if (!parsed.length) {
+        confirmBtn.disabled = true;
+        summary.appendChild(el('p', { class: 'field-error', text: 'Fant ingen oppskrifter i teksten ennå.' }));
+        return;
+      }
+      confirmBtn.disabled = false;
+      /* Forhåndsvisning: du skal se nøyaktig hva som blir lagt inn før du
+       * trykker – særlig mengdene, som er lettest å lese feil. */
+      parsed.forEach(function (r) {
+        var facts = [];
+        if (r.portions) facts.push(r.portions + ' porsjoner');
+        facts.push(r.ingredients.length + ' ingredienser');
+        if (r.steps.length) facts.push(r.steps.length + ' steg');
+        var exists = state.recipes.some(function (x) { return x.name.toLowerCase() === r.name.toLowerCase(); });
+        summary.appendChild(el('div', { class: 'import-item' }, [
+          el('strong', { text: r.name }),
+          el('span', { class: 'import-facts', text: facts.join(' · ') + (exists ? ' · erstatter den som finnes' : '') }),
+          el('span', { class: 'import-preview', text: r.ingredients.map(ingredientLabel).join(', ') })
+        ]));
+      });
+    }
+
+    field.addEventListener('input', refresh);
+
+    confirmBtn.addEventListener('click', function () {
+      var res = importRecipes(parsed);
+      closeOverlay();
+      var parts = [];
+      if (res.added) parts.push(res.added + (res.added === 1 ? ' ny oppskrift' : ' nye oppskrifter'));
+      if (res.updated) parts.push(res.updated + ' oppdatert');
+      showConfirmModal({
+        title: 'Importert',
+        description: parts.join(' og ') + '.',
+        confirmLabel: 'Greit',
+        cancelLabel: 'Lukk',
+        onConfirm: function () {}
+      });
+    });
+
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
+    cancelBtn.addEventListener('click', closeOverlay);
+
+    var modal = el('div', { class: 'modal wide' }, [
+      el('h2', { text: 'Importer oppskrifter' }),
+      el('p', { text: 'Lim inn én eller flere oppskrifter. Start hver oppskrift med «#» og navnet. Ingredienser og fremgangsmåte kan stå under hver sin overskrift.' }),
+      field,
+      summary,
+      el('div', { class: 'modal-actions' }, [cancelBtn, confirmBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+    setTimeout(function () { field.focus(); }, 30);
   }
 
   function confirmDeleteRecipe (recipe) {
@@ -1457,19 +1729,31 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return found;
   }
 
-  function addRecipe (name, ingredients) {
+  function addRecipe (data, quiet) {
     var now = Date.now();
-    state.recipes.push({ id: uid(), name: name, ingredients: ingredients, createdAt: now, updatedAt: now });
+    state.recipes.push({
+      id: uid(),
+      name: data.name,
+      portions: normalizePortions(data.portions),
+      ingredients: normalizeIngredients(data.ingredients),
+      steps: normalizeSteps(data.steps),
+      createdAt: now,
+      updatedAt: now
+    });
+    if (quiet) return;
     render();
     scheduleSave();
   }
 
-  function updateRecipe (id, name, ingredients) {
+  function updateRecipe (id, data, quiet) {
     var recipe = findRecipe(id);
     if (!recipe) return;
-    recipe.name = name;
-    recipe.ingredients = ingredients;
+    recipe.name = data.name;
+    recipe.portions = normalizePortions(data.portions);
+    recipe.ingredients = normalizeIngredients(data.ingredients);
+    recipe.steps = normalizeSteps(data.steps);
     recipe.updatedAt = Date.now();
+    if (quiet) return;
     render();
     scheduleSave();
   }
@@ -1481,10 +1765,109 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     scheduleSave();
   }
 
+  /* ============================== import av oppskrifter ============================== */
+
+  /* Tolker oppskrifter skrevet som vanlig tekst. Formatet er med vilje løst:
+   * det skal tåle å bli skrevet for hånd, limt inn fra et nettsted, eller
+   * generert. «#» starter en ny oppskrift; ellers gjetter vi oss fram. */
+
+  var UNIT = '(?:g|gram|kg|hg|dl|cl|ml|l|liter|ss|ts|krm|stk|pk|pakke|pakker|boks|bokser|dåse|dåser|glass|fedd|neve|never|klype|klyper|kopp|kopper|pose|poser|skive|skiver|cup|cups|bunt|bunter|stilk|stilker|stang|stenger|hode|hoder|potte|potter|kvast|blad|bit|biter|ark|terning|terninger|cm|pors\\.?)';
+  var AMOUNT_RE = new RegExp(
+    '^((?:\\d+(?:[.,]\\d+)?(?:\\s*[-–]\\s*\\d+(?:[.,]\\d+)?)?|\\d+\\s*\\/\\s*\\d+|[½¼¾]))\\s*(' + UNIT + ')?\\.?\\s+(.+)$', 'i');
+
+  var HEAD_ING = /^(?:ingredienser|ingrediensar|du trenger|dette trenger du|varer)\s*:?\s*$/i;
+  var HEAD_STEP = /^(?:fremgangsm[åa]te|framgangsm[åa]te|slik gj[øo]r du(?: det)?|slik lager du det|metode|steg|oppskrift|tilberedning)\s*:?\s*$/i;
+  var PORTIONS_RE = /^(?:porsjoner?|antall porsjoner|serverer)\s*:?\s*(\d+)/i;
+  var PORTIONS_ALT_RE = /^(\d+)\s*porsjoner?\.?$/i;
+
+  function stripBullet (line) {
+    return line.replace(/^\s*(?:[-*•‣–—]|\d+[.)])\s*/, '').trim();
+  }
+
+  function parseIngredientLine (line) {
+    var text = stripBullet(line);
+    if (!text) return null;
+    var m = text.match(AMOUNT_RE);
+    if (!m) return { name: normalizeName(text), qty: 1, amount: '' };
+    var number = m[1].trim();
+    var unit = (m[2] || '').trim();
+    var rest = normalizeName(m[3]);
+    if (!rest) return { name: normalizeName(text), qty: 1, amount: '' };
+    if (unit) return { name: rest, qty: 1, amount: (number + ' ' + unit).trim() };
+    /* Tall uten enhet – «2 egg» – er et antall, ikke en mengde. */
+    var n = parseInt(number, 10);
+    if (/^\d+$/.test(number) && n >= 1 && n <= 99) return { name: rest, qty: n, amount: '' };
+    return { name: rest, qty: 1, amount: number };
+  }
+
+  function parseRecipeText (text) {
+    var lines = (text || '').replace(/\r\n?/g, '\n').split('\n');
+    var recipes = [];
+    var current = null;
+    var section = 'ingredients';
+
+    function start (name) {
+      current = { name: normalizeName(name) || 'Oppskrift', portions: null, ingredients: [], steps: [] };
+      section = 'ingredients';
+      recipes.push(current);
+    }
+
+    var sawHeading = lines.some(function (l) { return /^\s*#/.test(l); });
+
+    lines.forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) return;
+
+      var headingMatch = line.match(/^#+\s*(.+)$/);
+      if (headingMatch) { start(headingMatch[1]); return; }
+
+      /* Uten «#»-overskrifter blir den første linjen navnet. */
+      if (!current) {
+        if (!sawHeading) { start(line); return; }
+        start(line);
+        return;
+      }
+
+      var p = line.match(PORTIONS_RE) || line.match(PORTIONS_ALT_RE);
+      if (p) { current.portions = normalizePortions(p[1]); return; }
+
+      if (HEAD_ING.test(line)) { section = 'ingredients'; return; }
+      if (HEAD_STEP.test(line)) { section = 'steps'; return; }
+
+      if (section === 'steps') {
+        var step = stripBullet(line);
+        if (step) current.steps.push(step);
+        return;
+      }
+      var ing = parseIngredientLine(line);
+      if (ing && ing.name) current.ingredients.push(ing);
+    });
+
+    return recipes.filter(function (r) { return r.ingredients.length || r.steps.length; });
+  }
+
+  /* Importerer, og oppdaterer en oppskrift som allerede finnes med samme navn
+   * i stedet for å lage en kopi. */
+  function importRecipes (parsed) {
+    var added = 0, updated = 0;
+    parsed.forEach(function (data) {
+      var match = null;
+      state.recipes.forEach(function (r) {
+        if (r.name.toLowerCase() === data.name.toLowerCase()) match = r;
+      });
+      if (match) { updateRecipe(match.id, data, true); updated++; }
+      else { addRecipe(data, true); added++; }
+    });
+    if (added || updated) { render(); scheduleSave(); }
+    return { added: added, updated: updated };
+  }
+
   function applyRecipeToActiveList (recipe) {
     var list = getActiveList();
     var adder = getName();
-    recipe.ingredients.forEach(function (ing) { mergeItemIntoList(list, ing.name, ing.qty, adder); });
+    recipe.ingredients.forEach(function (ing) {
+      mergeItemIntoList(list, ingredientShoppingName(ing), ing.qty, adder);
+    });
     currentView = 'lists';
     render();
     scheduleSave();
