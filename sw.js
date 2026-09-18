@@ -5,7 +5,7 @@
  * mellomlagres aldri her, slik at dere aldri ser gamle lister.
  */
 
-var VERSION = 'handleliste-180920261316';
+var VERSION = 'handleliste-180920261449';
 var SHELL_CACHE = VERSION + '-shell';   // appens egne filer
 var VENDOR_CACHE = VERSION + '-vendor'; // firebase-sdk + skrifter
 

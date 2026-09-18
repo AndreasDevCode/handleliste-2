@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '180920261316';
+  var APP_VERSION = '180920261449';
 
   /* ============================== styling ============================== */
 
@@ -420,8 +420,44 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '}',
     '.sort-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}',
 
-    '.die-badge{display:inline-flex;align-items:center;color:var(--accent);flex:none;}',
+    '.recipe-title-wrap{flex:1;min-width:0;}',
+    '.die-badge{',
+    '  display:inline-flex;align-items:center;justify-content:center;',
+    '  vertical-align:-7px;margin-left:8px;',
+    '  width:28px;height:28px;padding:0;cursor:pointer;',
+    '  border:1px solid var(--accent);border-radius:var(--radius-sm);',
+    '  background:var(--accent-soft);color:var(--accent);',
+    '}',
+    '.die-badge:active{background:var(--accent);color:var(--accent-ink);}',
+    '.modal .die-row{margin-top:4px;}',
     '.die-block{margin:14px 0 4px;}',
+
+    /* --- glider for mengde --- */
+    '.scale-block{margin:12px 0 2px;}',
+    '.scale-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}',
+    '.scale-head .field-label{margin:0;}',
+    '.scale-value{font-size:14.5px;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;}',
+    '.scale-value.changed{color:var(--accent);}',
+    /* «.modal input» gir alle felt i et vindu ramme og fyll – glideren må
+     * overstyre det, og trenger høyere spesifisitet enn den regelen. */
+    '.modal input.scale-slider, .scale-slider{',
+    '  -webkit-appearance:none;appearance:none;width:100%;height:24px;',
+    '  margin:10px 0 0;padding:0;border:0;border-radius:999px;',
+    '  background:transparent;cursor:pointer;',
+    '}',
+    '.scale-slider::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:var(--surface-2);}',
+    '.scale-slider::-moz-range-track{height:6px;border-radius:999px;background:var(--surface-2);}',
+    '.scale-slider::-webkit-slider-thumb{',
+    '  -webkit-appearance:none;appearance:none;margin-top:-9px;',
+    '  width:24px;height:24px;border-radius:50%;',
+    '  background:var(--accent);border:3px solid var(--surface);',
+    '  box-shadow:0 1px 4px rgba(24,32,20,.35);',
+    '}',
+    '.scale-slider::-moz-range-thumb{',
+    '  width:24px;height:24px;border-radius:50%;border:3px solid var(--surface);',
+    '  background:var(--accent);box-shadow:0 1px 4px rgba(24,32,20,.35);',
+    '}',
+    '.scale-slider:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:999px;}',
     '.die-row{display:flex;gap:6px;}',
     '.die-btn{',
     '  flex:1;display:flex;align-items:center;justify-content:center;',
@@ -434,7 +470,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.recipe-open-hint{display:inline-block;margin-top:6px;font-size:13px;font-weight:600;color:var(--accent);}',
     '.recipe-open:active .recipe-open-hint{opacity:.6;}',
 
-    '.modal.reader h2{margin-bottom:2px;}',
+    '.modal.reader{position:relative;}',
+    '.modal.reader h2{margin-bottom:2px;padding:0 30px;}',
+    '.modal-close{',
+    '  position:absolute;top:12px;right:12px;z-index:1;',
+    '  width:34px;height:34px;display:flex;align-items:center;justify-content:center;',
+    '  border:0;border-radius:50%;cursor:pointer;',
+    '  background:var(--surface-2);color:var(--ink-soft);',
+    '}',
+    '.modal-close:active{background:var(--line);}',
     '.reader-portions{font-size:13px;color:var(--muted);margin-bottom:14px;}',
     '.reader-heading{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px;}',
     '.reader-ingredients{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}',
@@ -850,10 +894,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function normalizeIngredients (raw) {
     if (!Array.isArray(raw)) return [];
     return raw.map(function (ing) {
+      var qty = normalizeQty(ing && ing.qty);
       return {
         name: normalizeName(ing && ing.name),
-        qty: normalizeQty(ing && ing.qty),
-        amount: normalizeName(ing && ing.amount).slice(0, 40)
+        qty: qty,
+        amount: normalizeName(ing && ing.amount).slice(0, 40),
+        /* «counted» sier om tallet er et antall som skal skaleres. Eldre data
+         * uten feltet tolkes ut fra antallet: står det mer enn én, var det et
+         * antall noen har skrevet inn. */
+        counted: (ing && typeof ing.counted === 'boolean') ? ing.counted : qty > 1
       };
     }).filter(function (ing) { return ing.name; });
   }
@@ -879,6 +928,75 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       if (m) { var n = parseInt(m[0], 10); if (n >= 1) return Math.min(99, n); }
     }
     return null;
+  }
+
+  /* ---- Skalering av mengder ----
+   * Glideren i oppskriften ganger opp eller ned mengdene. Mengden er fritekst
+   * («500 g», «1/2 ts», «50-100 g», «1 neve»), så vi tolker tallet som står
+   * først, ganger det, og lar resten av teksten stå urørt. Står det ikke noe
+   * tall – «salt og pepper», «1 neve» – blir mengden stående som den er. */
+
+  /* Brøken må stå først i alternativene: ellers spiser «\d+» bare 1-tallet i
+   * «1/2», og resten blir stående igjen som tekst. */
+  var NUM_PAT = '(?:\\d+\\s*\\/\\s*\\d+|\\d+(?:[.,]\\d+)?|[½¼¾])';
+  var SCALE_RE = new RegExp('^(' + NUM_PAT + ')(?:\\s*[-–]\\s*(' + NUM_PAT + '))?(\\s*.*)$');
+
+  function parseNum (s) {
+    s = (s || '').trim();
+    if (s === '½') return 0.5;
+    if (s === '¼') return 0.25;
+    if (s === '¾') return 0.75;
+    var frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (frac) {
+      var d = parseInt(frac[2], 10);
+      return d ? parseInt(frac[1], 10) / d : null;
+    }
+    var n = parseFloat(s.replace(',', '.'));
+    return isFinite(n) ? n : null;
+  }
+
+  /* Avrunding som gir tall man kjenner igjen på et kjøkken: 750, 1,5, 0,25. */
+  function formatNum (n) {
+    if (!isFinite(n)) return '';
+    var r;
+    if (n >= 20) r = Math.round(n);
+    else if (n >= 1) r = Math.round(n * 10) / 10;
+    else r = Math.round(n * 100) / 100;
+    return String(r).replace('.', ',');
+  }
+
+  function scaleAmount (text, factor) {
+    if (!text || factor === 1) return text;
+    var m = text.match(SCALE_RE);
+    if (!m) return text;
+    var first = parseNum(m[1]);
+    if (first === null) return text;
+    var out = formatNum(first * factor);
+    if (m[2]) {
+      var second = parseNum(m[2]);
+      if (second !== null) out += '-' + formatNum(second * factor);
+    }
+    return out + (m[3] || '');
+  }
+
+  function scaleIngredient (ing, factor) {
+    if (factor === 1) return ing;
+    /* Mengde og antall er to alternativer: har ingrediensen en mengde, er det
+     * den som skal skaleres – ellers ville «500 g kjøttdeig» blitt doblet to
+     * ganger, både i mengden og i antallet. */
+    if (ing.amount) {
+      return { name: ing.name, qty: ing.qty, amount: scaleAmount(ing.amount, factor), counted: ing.counted };
+    }
+    /* «salt og pepper» har ingen mengde i det hele tatt, og skal ikke bli til
+     * «2 salt og pepper». Bare ingredienser der det faktisk stod et antall –
+     * «2 egg», «1 løk» – ganges opp. */
+    if (!ing.counted) return ing;
+    return {
+      name: ing.name,
+      amount: '',
+      counted: true,
+      qty: Math.max(1, Math.min(999, Math.round(ing.qty * factor)))
+    };
   }
 
   /* Ingrediensen slik den skal se ut på handlelisten: mengden henger med i
@@ -1395,8 +1513,25 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var delBtn = el('button', { class: 'tab-icon-btn', type: 'button', 'aria-label': 'Slett oppskrift', html: ICON_TRASH });
     delBtn.addEventListener('click', function () { confirmDeleteRecipe(recipe); });
 
+    /* Terningen står ved siden av navnet og er samtidig knappen for å endre
+     * kastet – da slipper du å åpne hele oppskriften for å gi en ny karakter. */
+    var titleEl = el('h3', { text: recipe.name });
+    if (recipe.rating) {
+      var dieBtn = el('button', {
+        type: 'button', class: 'die-badge',
+        html: dieSvg(recipe.rating, 18),
+        'aria-label': 'Terningkast ' + recipe.rating + ' – trykk for å endre'
+      });
+      dieBtn.addEventListener('click', function () { showRatingModal(recipe); });
+      /* Terningen ligger inne i overskriften, ikke ved siden av, slik at den
+       * følger siste ord i navnet i stedet for å falle ned på egen linje når
+       * tittelen er lang. */
+      titleEl.appendChild(dieBtn);
+    }
+    var titleWrap = el('div', { class: 'recipe-title-wrap' }, [titleEl]);
+
     var head = el('div', { class: 'recipe-card-head' }, [
-      el('h3', { text: recipe.name }),
+      titleWrap,
       el('div', { class: 'recipe-card-actions' }, [editBtn, delBtn])
     ]);
 
@@ -1407,19 +1542,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (recipe.steps.length) facts.push(recipe.steps.length + ' steg');
 
     var factsRow = el('div', { class: 'recipe-facts' });
-    if (recipe.rating) {
-      factsRow.appendChild(el('span', {
-        class: 'die-badge', html: dieSvg(recipe.rating, 17),
-        'aria-label': 'Terningkast ' + recipe.rating
-      }));
-    }
     if (facts.length) factsRow.appendChild(el('span', { text: facts.join(' · ') }));
 
     var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
     addBtn.addEventListener('click', function () { applyRecipeToActiveList(recipe); });
 
     var body = el('button', { type: 'button', class: 'recipe-open' }, [
-      (recipe.rating || facts.length) ? factsRow : null,
+      facts.length ? factsRow : null,
       el('p', { class: 'recipe-ing-preview', text: preview || 'Ingen ingredienser' }),
       recipe.steps.length ? el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' }) : null
     ]);
@@ -1428,25 +1557,19 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return el('div', { class: 'recipe-card' }, [head, body, addBtn]);
   }
 
-  /* Hele oppskriften i lesbar form – det er denne som gjør at de håndskrevne
-   * arkene kan bli liggende i skuffen. */
-  function showRecipeReader (recipe) {
-    closeOverlay();
+  /* Raden med seks terninger. Trykk på en for å gi kastet, og på den du
+   * allerede har gitt for å fjerne det. Brukes både inne i oppskriften og i
+   * det lille vinduet du får når du trykker på terningen ved siden av navnet. */
+  function buildDieRow (recipeId, onPicked) {
+    var row = el('div', { class: 'die-row' });
+    var buttons = [];
 
-    var kids = [el('h2', { text: recipe.name })];
-    if (recipe.portions) kids.push(el('div', { class: 'reader-portions', text: recipe.portions + ' porsjoner' }));
-
-    /* Terningkast: trykk på en terning for å gi den, trykk på den samme igjen
-     * for å fjerne den. Kastet deles med den andre telefonen. */
-    var dieRow = el('div', { class: 'die-row' });
-    var dieButtons = [];
-
-    function paintDice () {
+    function paint () {
       /* Leser terningen fra tilstanden, ikke fra en kopi – da stemmer den også
        * hvis den andre telefonen har kastet terning i mellomtiden. */
-      var live = findRecipe(recipe.id);
+      var live = findRecipe(recipeId);
       var current = live ? live.rating : null;
-      dieButtons.forEach(function (b) {
+      buttons.forEach(function (b) {
         var on = b.__value === current;
         b.classList.toggle('active', on);
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1461,31 +1584,111 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         });
         btn.__value = value;
         btn.addEventListener('click', function () {
-          var live = findRecipe(recipe.id);
-          setRecipeRating(recipe.id, (live && live.rating === value) ? null : value);
-          paintDice();
+          var live = findRecipe(recipeId);
+          var next = (live && live.rating === value) ? null : value;
+          setRecipeRating(recipeId, next);
+          paint();
+          if (onPicked) onPicked(next);
         });
-        dieButtons.push(btn);
-        dieRow.appendChild(btn);
+        buttons.push(btn);
+        row.appendChild(btn);
       })(d);
     }
-    paintDice();
-    kids.push(el('div', { class: 'die-block' }, [
-      el('span', { class: 'field-label', text: 'Terningkast' }),
-      dieRow
-    ]));
+    paint();
+    return row;
+  }
+
+  /* Det lille vinduet du får når du trykker på terningen på oppskriftskortet. */
+  function showRatingModal (recipe) {
+    closeOverlay();
+    var row = buildDieRow(recipe.id, function () { closeOverlay(); });
+    var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
+    closeBtn.addEventListener('click', closeOverlay);
+
+    var modal = el('div', { class: 'modal' }, [
+      el('h2', { text: 'Terningkast' }),
+      el('p', { text: recipe.name + '. Trykk på terningen du allerede har gitt for å fjerne kastet.' }),
+      row,
+      el('div', { class: 'modal-actions' }, [closeBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+  }
+
+  /* Hele oppskriften i lesbar form – det er denne som gjør at de håndskrevne
+   * arkene kan bli liggende i skuffen. */
+  function showRecipeReader (recipe) {
+    closeOverlay();
+
+    var kids = [el('h2', { text: recipe.name })];
+
+    /* Glideren skalerer mengdene. Den endrer ikke selve oppskriften – den
+     * står igjen som den er neste gang du åpner den. */
+    var factor = 1;
+    var steps = [];
+    if (recipe.portions) {
+      var top = Math.max(12, recipe.portions * 2);
+      for (var p = 1; p <= top; p++) steps.push({ value: p, factor: p / recipe.portions, label: p + (p === 1 ? ' porsjon' : ' porsjoner') });
+    } else {
+      [0.5, 1, 1.5, 2, 2.5, 3, 4].forEach(function (f) {
+        steps.push({ value: f, factor: f, label: '× ' + formatNum(f) });
+      });
+    }
+    var startIndex = 0;
+    steps.forEach(function (s, i) { if (s.factor === 1) startIndex = i; });
+
+    var scaleValue = el('span', { class: 'scale-value', text: steps[startIndex].label });
+    var slider = el('input', {
+      type: 'range', class: 'scale-slider', name: 'scale',
+      min: '0', max: String(steps.length - 1), step: '1', value: String(startIndex),
+      'aria-label': 'Juster mengde'
+    });
 
     if (recipe.ingredients.length) {
-      kids.push(el('h3', { class: 'reader-heading', text: 'Ingredienser' }));
-      var ul = el('ul', { class: 'reader-ingredients' });
-      recipe.ingredients.forEach(function (ing) {
+      kids.push(el('div', { class: 'scale-block' }, [
+        el('div', { class: 'scale-head' }, [
+          el('span', { class: 'field-label', text: 'Mengde' }),
+          scaleValue
+        ]),
+        slider
+      ]));
+    } else if (recipe.portions) {
+      kids.push(el('div', { class: 'reader-portions', text: recipe.portions + ' porsjoner' }));
+    }
+
+    kids.push(el('div', { class: 'die-block' }, [
+      el('span', { class: 'field-label', text: 'Terningkast' }),
+      buildDieRow(recipe.id)
+    ]));
+
+    var ul = null;
+    function paintIngredients () {
+      if (!ul) return;
+      ul.innerHTML = '';
+      recipe.ingredients.forEach(function (raw) {
+        var ing = scaleIngredient(raw, factor);
         var amount = ing.amount || (ing.qty > 1 ? String(ing.qty) : '');
         ul.appendChild(el('li', {}, [
           el('span', { class: 'reader-amount', text: amount }),
           el('span', { class: 'reader-ing-name', text: ing.name })
         ]));
       });
+    }
+
+    if (recipe.ingredients.length) {
+      kids.push(el('h3', { class: 'reader-heading', text: 'Ingredienser' }));
+      ul = el('ul', { class: 'reader-ingredients' });
+      paintIngredients();
       kids.push(ul);
+
+      slider.addEventListener('input', function () {
+        var s = steps[parseInt(slider.value, 10)] || steps[startIndex];
+        factor = s.factor;
+        scaleValue.textContent = s.label;
+        scaleValue.classList.toggle('changed', factor !== 1);
+        paintIngredients();
+      });
     }
 
     if (recipe.steps.length) {
@@ -1496,16 +1699,22 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     }
 
     var addBtn = el('button', { class: 'primary', type: 'button', text: 'Legg i handlelisten' });
-    addBtn.addEventListener('click', function () { closeOverlay(); applyRecipeToActiveList(recipe); });
+    addBtn.addEventListener('click', function () { closeOverlay(); applyRecipeToActiveList(recipe, factor); });
     var editBtn = el('button', { class: 'secondary', type: 'button', text: 'Rediger' });
     editBtn.addEventListener('click', function () { showRecipeEditor(recipe); });
-    var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
-    closeBtn.addEventListener('click', closeOverlay);
-
     if (recipe.ingredients.length) kids.push(el('div', { class: 'modal-actions' }, [editBtn, addBtn]));
-    else kids.push(el('div', { class: 'modal-actions' }, [closeBtn, editBtn]));
+    else kids.push(el('div', { class: 'modal-actions' }, [editBtn]));
 
     var modal = el('div', { class: 'modal wide reader' }, kids);
+
+    /* Kryss øverst til høyre. Uten det er eneste vei ut å legge oppskriften i
+     * handlelisten eller å redigere den – og det er ikke alltid det du vil. */
+    var closeBtn = el('button', {
+      class: 'modal-close', type: 'button', 'aria-label': 'Lukk',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>'
+    });
+    closeBtn.addEventListener('click', closeOverlay);
+    modal.insertBefore(closeBtn, modal.firstChild);
     var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
     document.body.appendChild(overlay);
@@ -1517,6 +1726,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var existing = document.getElementById('modal-overlay');
     if (existing) existing.remove();
   }
+
+  /* Escape lukker vinduer på PC. Det ene vinduet som må besvares – spørsmålet
+   * om navn første gang – er merket «required» og lukkes ikke slik. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var overlay = document.getElementById('modal-overlay');
+    if (!overlay || overlay.querySelector('.modal.required')) return;
+    closeOverlay();
+  });
 
   function showPromptModal (opts) {
     closeOverlay();
@@ -1533,7 +1751,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var modalKids = [el('h2', { text: opts.title })];
     if (opts.description) modalKids.push(el('p', { text: opts.description }));
     modalKids.push(form);
-    var modal = el('div', { class: 'modal' }, modalKids);
+    var modal = el('div', { class: 'modal' + (opts.dismissible ? '' : ' required') }, modalKids);
     var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
     if (opts.dismissible) overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
     document.body.appendChild(overlay);
@@ -1613,8 +1831,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       portions: existing && existing.portions ? String(existing.portions) : '',
       steps: existing && existing.steps.length ? existing.steps.join('\n') : '',
       ingredients: existing && existing.ingredients.length
-        ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty, amount: i.amount || '' }; })
-        : [{ name: '', qty: 1, amount: '' }]
+        ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty, amount: i.amount || '', counted: !!i.counted }; })
+        : [{ name: '', qty: 1, amount: '', counted: false }]
     };
 
     var nameInput = el('input', { type: 'text', class: 'recipe-name-input', placeholder: 'F.eks. Tacogryte', maxlength: '60', value: draft.name });
@@ -1643,7 +1861,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         if (ing.qty > 1) { ing.qty--; qtyValue.textContent = String(ing.qty); minusBtn.disabled = ing.qty <= 1; }
       });
       plusBtn.addEventListener('click', function () {
-        if (ing.qty < 999) { ing.qty++; qtyValue.textContent = String(ing.qty); minusBtn.disabled = false; }
+        if (ing.qty < 999) {
+          ing.qty++;
+          /* Setter du et antall her, er det et antall som skal skaleres. */
+          ing.counted = true;
+          qtyValue.textContent = String(ing.qty);
+          minusBtn.disabled = false;
+        }
       });
       var stepper = el('div', { class: 'qty-stepper sm' }, [minusBtn, qtyValue, plusBtn]);
 
@@ -1653,6 +1877,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
           ing.name = '';
           ing.qty = 1;
           ing.amount = '';
+          ing.counted = false;
           renderRows();
           return;
         }
@@ -1676,7 +1901,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     renderRows();
 
     var addIngBtn = el('button', { type: 'button', class: 'add-ingredient-btn', text: '+ Legg til ingrediens' });
-    addIngBtn.addEventListener('click', function () { draft.ingredients.push({ name: '', qty: 1, amount: '' }); renderRows(); });
+    addIngBtn.addEventListener('click', function () { draft.ingredients.push({ name: '', qty: 1, amount: '', counted: false }); renderRows(); });
 
     var stepsField = el('textarea', {
       class: 'steps-field',
@@ -2027,16 +2252,18 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var text = stripBullet(line);
     if (!text) return null;
     var m = text.match(AMOUNT_RE);
-    if (!m) return { name: normalizeName(text), qty: 1, amount: '' };
+    /* Ingen tall i linjen – «salt og pepper». counted:false gjør at den ikke
+     * ganges opp når man drar i mengdeglideren. */
+    if (!m) return { name: normalizeName(text), qty: 1, amount: '', counted: false };
     var number = m[1].trim();
     var unit = (m[2] || '').trim();
     var rest = normalizeName(m[3]);
-    if (!rest) return { name: normalizeName(text), qty: 1, amount: '' };
-    if (unit) return { name: rest, qty: 1, amount: (number + ' ' + unit).trim() };
+    if (!rest) return { name: normalizeName(text), qty: 1, amount: '', counted: false };
+    if (unit) return { name: rest, qty: 1, amount: (number + ' ' + unit).trim(), counted: false };
     /* Tall uten enhet – «2 egg» – er et antall, ikke en mengde. */
     var n = parseInt(number, 10);
-    if (/^\d+$/.test(number) && n >= 1 && n <= 99) return { name: rest, qty: n, amount: '' };
-    return { name: rest, qty: 1, amount: number };
+    if (/^\d+$/.test(number) && n >= 1 && n <= 99) return { name: rest, qty: n, amount: '', counted: true };
+    return { name: rest, qty: 1, amount: number, counted: false };
   }
 
   function parseRecipeText (text) {
@@ -2101,10 +2328,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return { added: added, updated: updated };
   }
 
-  function applyRecipeToActiveList (recipe) {
+  function applyRecipeToActiveList (recipe, factor) {
     var list = getActiveList();
     var adder = getName();
-    recipe.ingredients.forEach(function (ing) {
+    var f = (typeof factor === 'number' && isFinite(factor) && factor > 0) ? factor : 1;
+    recipe.ingredients.forEach(function (raw) {
+      /* Har du dratt i glideren, er det de skalerte mengdene som skal handles. */
+      var ing = scaleIngredient(raw, f);
       mergeItemIntoList(list, ingredientShoppingName(ing), ing.qty, adder);
     });
     currentView = 'lists';
