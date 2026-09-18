@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '180920261252';
+  var APP_VERSION = '180920261316';
 
   /* ============================== styling ============================== */
 
@@ -400,7 +400,36 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  display:block;width:100%;text-align:left;border:0;background:transparent;',
     '  padding:0;margin:0 0 12px;cursor:pointer;font:inherit;color:inherit;',
     '}',
-    '.recipe-facts{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
+    '.recipe-facts{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
+
+    /* --- søk, sortering og terningkast --- */
+    '.recipe-search{',
+    '  width:100%;padding:11px 14px;margin-bottom:10px;',
+    '  border:1px solid var(--line);border-radius:var(--radius-md);',
+    '  background:var(--surface);color:var(--ink);',
+    '  font-family:inherit;font-size:16px;',
+    '  -webkit-appearance:none;appearance:none;',
+    '}',
+    '.recipe-search:focus{outline:2px solid var(--accent);outline-offset:1px;}',
+    '.recipe-search::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;}',
+    '.sort-row{display:flex;gap:6px;margin-bottom:14px;}',
+    '.sort-btn{',
+    '  flex:1;padding:8px 6px;border-radius:999px;cursor:pointer;',
+    '  border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);',
+    '  font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;',
+    '}',
+    '.sort-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}',
+
+    '.die-badge{display:inline-flex;align-items:center;color:var(--accent);flex:none;}',
+    '.die-block{margin:14px 0 4px;}',
+    '.die-row{display:flex;gap:6px;}',
+    '.die-btn{',
+    '  flex:1;display:flex;align-items:center;justify-content:center;',
+    '  padding:7px 0;border-radius:var(--radius-sm);cursor:pointer;',
+    '  border:1px solid var(--line);background:var(--surface);color:var(--muted);',
+    '}',
+    '.die-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}',
+    '.die-btn:active{background:var(--surface-2);}',
     '.recipe-open .recipe-ing-preview{margin:0;}',
     '.recipe-open-hint{display:inline-block;margin-top:6px;font-size:13px;font-weight:600;color:var(--accent);}',
     '.recipe-open:active .recipe-open-hint{opacity:.6;}',
@@ -487,6 +516,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ACTIVE_LIST_KEY = 'handleliste_active_list_v1';
   var FIREBASE_CONFIG_KEY = 'handleliste_firebase_config_v1';
   var STATE_CACHE_KEY = 'handleliste_state_cache_v1';
+  var RECIPE_SORT_KEY = 'handleliste_recipe_sort_v1';
   var DOC_COLLECTION = 'handleliste-app';
   var DOC_ID = 'shared-state';
 
@@ -516,6 +546,18 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function storeFirebaseConfig (cfg) {
     try { localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
   }
+  /* Sorteringsvalget er en visningspreferanse, og lagres bare på denne
+   * telefonen – det trenger ikke være likt hos dere begge. */
+  function getStoredRecipeSort () {
+    try {
+      var v = localStorage.getItem(RECIPE_SORT_KEY);
+      return (v === 'name' || v === 'new' || v === 'rating') ? v : 'rating';
+    } catch (e) { return 'rating'; }
+  }
+  function setStoredRecipeSort (v) {
+    try { localStorage.setItem(RECIPE_SORT_KEY, v); } catch (e) {}
+  }
+
   function clearCachedState () {
     try { localStorage.removeItem(STATE_CACHE_KEY); } catch (e) {}
   }
@@ -541,6 +583,16 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
   function uid () {
     return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  /* Opprettelsestidspunkt som alltid går framover, også når flere rader lages
+   * i samme millisekund – ellers får en hel import samme tidsstempel, og
+   * «Nyest» blir meningsløst innbyrdes. */
+  var lastCreatedAt = 0;
+  function nextCreatedAt () {
+    var now = Date.now();
+    lastCreatedAt = now > lastCreatedAt ? now : lastCreatedAt + 1;
+    return lastCreatedAt;
   }
 
   /* ============================== shared state + migration ============================== */
@@ -769,12 +821,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   function mergeRecipes (a, b) {
     var base = pickNewer(a, b, 'updatedAt');
+    /* Terningkastet har sin egen klokke, slik at «hun ga den en femmer» ikke
+     * blir borte fordi han rettet et steg i mellomtiden. */
+    var rated = pickNewer(a, b, 'ratedAt');
     return {
       id: a.id,
       name: base.name,
       portions: base.portions,
       ingredients: base.ingredients,
       steps: base.steps,
+      rating: rated.rating,
+      ratedAt: Math.max(a.ratedAt, b.ratedAt),
       createdAt: Math.min(a.createdAt, b.createdAt),
       updatedAt: Math.max(a.updatedAt, b.updatedAt)
     };
@@ -806,6 +863,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       return (s || '').toString().trim().replace(/\s+/g, ' ').slice(0, 600);
     }).filter(function (s) { return s; });
   }
+  /* Terningkast: 1-6, eller null for «ikke kastet ennå». */
+  function normalizeRating (raw) {
+    var n = null;
+    if (typeof raw === 'number' && isFinite(raw)) n = Math.round(raw);
+    else if (typeof raw === 'string' && /\d/.test(raw)) n = parseInt(raw.match(/\d+/)[0], 10);
+    if (n === null || n < 1 || n > 6) return null;
+    return n;
+  }
+
   function normalizePortions (raw) {
     if (typeof raw === 'number' && isFinite(raw) && raw >= 1) return Math.min(99, Math.round(raw));
     if (typeof raw === 'string') {
@@ -854,6 +920,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
           portions: normalizePortions(r && r.portions),
           ingredients: normalizeIngredients(r && r.ingredients),
           steps: normalizeSteps(r && r.steps),
+          rating: normalizeRating(r && r.rating),
+          ratedAt: num(r && r.ratedAt, 0),
           createdAt: num(r && r.createdAt, idx + 1),
           updatedAt: num(r && r.updatedAt, idx + 1)
         };
@@ -899,6 +967,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * vinne over det som ligger i skyen – ellers ville de blitt stille borte. */
   var hasUnsyncedEdits = false;
   var retryTimer = null;
+  var recipeQuery = '';
+  var recipeSort = getStoredRecipeSort();
   var draftName = '';
   var draftQty = 1;
   var currentView = 'lists';
@@ -931,7 +1001,25 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ICON_PENCIL = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
   var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
   var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
-  var ICON_PLUS_BIG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
+  /* Terning med riktig antall øyne, tegnet som SVG. */
+  var DIE_PIPS = {
+    1: [[12, 12]],
+    2: [[8, 8], [16, 16]],
+    3: [[8, 8], [12, 12], [16, 16]],
+    4: [[8, 8], [16, 8], [8, 16], [16, 16]],
+    5: [[8, 8], [16, 8], [12, 12], [8, 16], [16, 16]],
+    6: [[8, 7.5], [16, 7.5], [8, 12], [16, 12], [8, 16.5], [16, 16.5]]
+  };
+  function dieSvg (n, size) {
+    var pips = (DIE_PIPS[n] || []).map(function (p) {
+      return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="1.85" fill="currentColor"></circle>';
+    }).join('');
+    return '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '" aria-hidden="true">' +
+      '<rect x="2.5" y="2.5" width="19" height="19" rx="4.5" fill="none" stroke="currentColor" stroke-width="1.6"></rect>' +
+      pips + '</svg>';
+  }
+
+  var ICON_PLUS_BIG ='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
 
   var root = el('div', { id: 'root' });
   document.body.appendChild(root);
@@ -1199,6 +1287,35 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return li;
   }
 
+  /* Sorterer og filtrerer oppskriftene slik listen skal vises. */
+  function visibleRecipes () {
+    var q = recipeQuery.trim().toLowerCase();
+    var list = state.recipes.filter(function (r) {
+      if (!q) return true;
+      /* Søket ser på navnet OG ingrediensene, så «kylling» finner retter som
+       * har kylling i seg selv om ordet ikke står i tittelen. */
+      if (r.name.toLowerCase().indexOf(q) !== -1) return true;
+      return r.ingredients.some(function (i) { return i.name.toLowerCase().indexOf(q) !== -1; });
+    });
+
+    if (recipeSort === 'name') {
+      list.sort(function (a, b) { return a.name.localeCompare(b.name, 'nb'); });
+    } else if (recipeSort === 'new') {
+      list.sort(function (a, b) {
+        if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+        return a.name.localeCompare(b.name, 'nb');
+      });
+    } else {
+      /* Terningkast: best først, og de uten terning nederst. */
+      list.sort(function (a, b) {
+        var ra = a.rating || 0, rb = b.rating || 0;
+        if (ra !== rb) return rb - ra;
+        return a.name.localeCompare(b.name, 'nb');
+      });
+    }
+    return list;
+  }
+
   function buildRecipesView (activeList) {
     var section = el('section', { class: 'list-section' });
 
@@ -1217,7 +1334,57 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     }
 
     var listEl = el('div', { class: 'recipe-list' });
-    state.recipes.forEach(function (r) { listEl.appendChild(buildRecipeCard(activeList, r)); });
+
+    /* Søkefeltet skriver rett i listen under, uten å bygge opp siden på nytt.
+     * Da mister ikke feltet fokus, og tastaturet blir stående på telefonen. */
+    var searchInput = el('input', {
+      type: 'search', class: 'recipe-search', name: 'recipeSearch',
+      placeholder: 'Søk i oppskrifter …', value: recipeQuery, autocomplete: 'off'
+    });
+
+    function paintList () {
+      listEl.innerHTML = '';
+      var found = visibleRecipes();
+      if (!found.length) {
+        listEl.appendChild(el('div', { class: 'empty-state' }, [
+          el('h3', { text: 'Ingen treff' }),
+          el('p', { text: 'Fant ingen oppskrifter som passer «' + recipeQuery.trim() + '».' })
+        ]));
+        return;
+      }
+      found.forEach(function (r) { listEl.appendChild(buildRecipeCard(activeList, r)); });
+    }
+
+    searchInput.addEventListener('input', function () {
+      recipeQuery = searchInput.value;
+      paintList();
+    });
+
+    var sortRow = el('div', { class: 'sort-row' });
+    [
+      { key: 'rating', label: 'Beste først' },
+      { key: 'name', label: 'A–Å' },
+      { key: 'new', label: 'Nyest' }
+    ].forEach(function (opt) {
+      var btn = el('button', {
+        type: 'button',
+        class: 'sort-btn' + (recipeSort === opt.key ? ' active' : ''),
+        text: opt.label
+      });
+      btn.addEventListener('click', function () {
+        if (recipeSort === opt.key) return;
+        recipeSort = opt.key;
+        setStoredRecipeSort(opt.key);
+        sortRow.querySelectorAll('.sort-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        paintList();
+      });
+      sortRow.appendChild(btn);
+    });
+
+    section.appendChild(searchInput);
+    section.appendChild(sortRow);
+    paintList();
     section.appendChild(listEl);
     return section;
   }
@@ -1239,11 +1406,20 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (recipe.portions) facts.push(recipe.portions + ' porsjoner');
     if (recipe.steps.length) facts.push(recipe.steps.length + ' steg');
 
+    var factsRow = el('div', { class: 'recipe-facts' });
+    if (recipe.rating) {
+      factsRow.appendChild(el('span', {
+        class: 'die-badge', html: dieSvg(recipe.rating, 17),
+        'aria-label': 'Terningkast ' + recipe.rating
+      }));
+    }
+    if (facts.length) factsRow.appendChild(el('span', { text: facts.join(' · ') }));
+
     var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
     addBtn.addEventListener('click', function () { applyRecipeToActiveList(recipe); });
 
     var body = el('button', { type: 'button', class: 'recipe-open' }, [
-      facts.length ? el('div', { class: 'recipe-facts', text: facts.join(' · ') }) : null,
+      (recipe.rating || facts.length) ? factsRow : null,
       el('p', { class: 'recipe-ing-preview', text: preview || 'Ingen ingredienser' }),
       recipe.steps.length ? el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' }) : null
     ]);
@@ -1259,6 +1435,45 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
     var kids = [el('h2', { text: recipe.name })];
     if (recipe.portions) kids.push(el('div', { class: 'reader-portions', text: recipe.portions + ' porsjoner' }));
+
+    /* Terningkast: trykk på en terning for å gi den, trykk på den samme igjen
+     * for å fjerne den. Kastet deles med den andre telefonen. */
+    var dieRow = el('div', { class: 'die-row' });
+    var dieButtons = [];
+
+    function paintDice () {
+      /* Leser terningen fra tilstanden, ikke fra en kopi – da stemmer den også
+       * hvis den andre telefonen har kastet terning i mellomtiden. */
+      var live = findRecipe(recipe.id);
+      var current = live ? live.rating : null;
+      dieButtons.forEach(function (b) {
+        var on = b.__value === current;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    for (var d = 1; d <= 6; d++) {
+      (function (value) {
+        var btn = el('button', {
+          type: 'button', class: 'die-btn', html: dieSvg(value, 26),
+          'aria-label': 'Gi terningkast ' + value
+        });
+        btn.__value = value;
+        btn.addEventListener('click', function () {
+          var live = findRecipe(recipe.id);
+          setRecipeRating(recipe.id, (live && live.rating === value) ? null : value);
+          paintDice();
+        });
+        dieButtons.push(btn);
+        dieRow.appendChild(btn);
+      })(d);
+    }
+    paintDice();
+    kids.push(el('div', { class: 'die-block' }, [
+      el('span', { class: 'field-label', text: 'Terningkast' }),
+      dieRow
+    ]));
 
     if (recipe.ingredients.length) {
       kids.push(el('h3', { class: 'reader-heading', text: 'Ingredienser' }));
@@ -1607,7 +1822,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function addList (name) {
     name = normalizeName(name);
     if (!name) return;
-    var now = Date.now();
+    var now = nextCreatedAt();
     var list = { id: uid(), name: name, createdAt: now, updatedAt: now, items: [] };
     state.lists.push(list);
     activeListId = list.id;
@@ -1741,13 +1956,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   function addRecipe (data, quiet) {
-    var now = Date.now();
+    var now = nextCreatedAt();
     state.recipes.push({
       id: uid(),
       name: data.name,
       portions: normalizePortions(data.portions),
       ingredients: normalizeIngredients(data.ingredients),
       steps: normalizeSteps(data.steps),
+      rating: normalizeRating(data.rating),
+      ratedAt: normalizeRating(data.rating) ? now : 0,
       createdAt: now,
       updatedAt: now
     });
@@ -1763,8 +1980,19 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     recipe.portions = normalizePortions(data.portions);
     recipe.ingredients = normalizeIngredients(data.ingredients);
     recipe.steps = normalizeSteps(data.steps);
+    /* Terningkastet røres ikke her – det settes for seg, og skal overleve at
+     * oppskriften redigeres eller importeres på nytt. */
     recipe.updatedAt = Date.now();
     if (quiet) return;
+    render();
+    scheduleSave();
+  }
+
+  function setRecipeRating (id, value) {
+    var recipe = findRecipe(id);
+    if (!recipe) return;
+    recipe.rating = normalizeRating(value);
+    recipe.ratedAt = Date.now();
     render();
     scheduleSave();
   }
