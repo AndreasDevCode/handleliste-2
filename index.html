@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '180920261512';
+  var APP_VERSION = '011020261316';
 
   /* ============================== styling ============================== */
 
@@ -436,6 +436,29 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.modal .die-row{margin-top:4px;}',
     '.die-block{margin:14px 0 4px;}',
 
+    /* --- bilde i oppskriften --- */
+    '.photo-block{margin:12px 0 2px;}',
+    '.photo-input{display:none !important;}',
+    '.photo{',
+    '  display:block;width:100%;max-width:100%;aspect-ratio:4/3;object-fit:cover;',
+    '  border-radius:var(--radius-md);background:var(--surface-2);',
+    '}',
+    '.photo-empty{',
+    '  display:flex;align-items:center;justify-content:center;width:100%;',
+    '  aspect-ratio:16/7;border-radius:var(--radius-md);',
+    '  border:1px dashed var(--line);background:transparent;',
+    '  color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;',
+    '}',
+    '.photo-empty.is-button{cursor:pointer;}',
+    '.photo-empty.is-button:active{background:var(--surface-2);color:var(--ink-soft);}',
+    '.photo-actions{display:flex;gap:14px;justify-content:center;margin-top:8px;}',
+    '.photo-link{',
+    '  border:0;background:transparent;padding:4px 2px;cursor:pointer;',
+    '  font-family:inherit;font-size:13px;font-weight:600;color:var(--accent);',
+    '}',
+    '.photo-link.danger{color:var(--warn);}',
+    '.photo-link:active{opacity:.6;}',
+
     /* --- glider for mengde --- */
     '.scale-block{margin:12px 0 2px;}',
     '.scale-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}',
@@ -566,6 +589,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var STATE_CACHE_KEY = 'handleliste_state_cache_v1';
   var RECIPE_SORT_KEY = 'handleliste_recipe_sort_v1';
   var DOC_COLLECTION = 'handleliste-app';
+  /* Bildene ligger i egne dokumenter, ett per oppskrift. Hovedlisten sendes på
+   * nytt hver gang noen krysser av en vare – ligger bildene der, blir hvert
+   * trykk flere megabyte over mobilnettet. */
+  var IMAGE_COLLECTION = 'handleliste-bilder';
   var DOC_ID = 'shared-state';
 
   function getName () {
@@ -880,6 +907,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       steps: base.steps,
       rating: rated.rating,
       ratedAt: Math.max(a.ratedAt, b.ratedAt),
+      hasImage: pickNewer(a, b, 'imageAt').hasImage,
+      imageAt: Math.max(a.imageAt, b.imageAt),
       createdAt: Math.min(a.createdAt, b.createdAt),
       updatedAt: Math.max(a.updatedAt, b.updatedAt)
     };
@@ -1044,6 +1073,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
           steps: normalizeSteps(r && r.steps),
           rating: normalizeRating(r && r.rating),
           ratedAt: num(r && r.ratedAt, 0),
+          /* Selve bildet ligger et annet sted – her står bare om det finnes,
+           * slik at oppskriften vet om den skal hente det. */
+          hasImage: !!(r && r.hasImage),
+          imageAt: num(r && r.imageAt, 0),
           createdAt: num(r && r.createdAt, idx + 1),
           updatedAt: num(r && r.updatedAt, idx + 1)
         };
@@ -1646,6 +1679,67 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
     var kids = [titleEl];
 
+    /* Bildeblokken. Den bytter mellom tre tilstander: tom («Legg til bilde»),
+     * henter, og ferdig bilde med knapper for å bytte eller fjerne. */
+    var photoBlock = el('div', { class: 'photo-block' });
+    var fileInput = el('input', { type: 'file', accept: 'image/*', class: 'photo-input' });
+
+    function paintPhoto (state_, url, message) {
+      photoBlock.innerHTML = '';
+      if (state_ === 'loading') {
+        photoBlock.appendChild(el('div', { class: 'photo-empty', text: 'Henter bilde …' }));
+        return;
+      }
+      if (state_ === 'image') {
+        photoBlock.appendChild(el('img', { class: 'photo', src: url, alt: 'Bilde av ' + recipe.name }));
+        var swapBtn = el('button', { type: 'button', class: 'photo-link', text: 'Bytt bilde' });
+        swapBtn.addEventListener('click', function () { fileInput.click(); });
+        var delBtn = el('button', { type: 'button', class: 'photo-link danger', text: 'Fjern' });
+        delBtn.addEventListener('click', function () {
+          paintPhoto('loading');
+          clearRecipeImage(recipe.id)
+            .then(function () { paintPhoto('empty'); })
+            .catch(function () { paintPhoto('image', url, 'Klarte ikke å fjerne bildet.'); });
+        });
+        photoBlock.appendChild(el('div', { class: 'photo-actions' }, [swapBtn, delBtn]));
+        if (message) photoBlock.appendChild(el('p', { class: 'field-error', text: message }));
+        return;
+      }
+      var addBtn = el('button', { type: 'button', class: 'photo-empty is-button', text: '+ Legg til bilde' });
+      addBtn.addEventListener('click', function () { fileInput.click(); });
+      photoBlock.appendChild(addBtn);
+      if (message) photoBlock.appendChild(el('p', { class: 'field-error', text: message }));
+    }
+
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (!file) return;
+      if (!isWriter) { paintPhoto(recipe.hasImage ? 'image' : 'empty', imageCache[recipe.id], 'Du må være tilkoblet for å lagre bilder.'); return; }
+      paintPhoto('loading');
+      compressImage(file)
+        .then(function (dataUrl) { return saveRecipeImage(recipe.id, dataUrl).then(function () { return dataUrl; }); })
+        .then(function (dataUrl) { paintPhoto('image', dataUrl); })
+        .catch(function (err) {
+          paintPhoto(recipe.hasImage ? 'image' : 'empty', imageCache[recipe.id],
+            (err && err.message) || 'Klarte ikke å lagre bildet.');
+        });
+    });
+
+    kids.push(photoBlock);
+    kids.push(fileInput);
+
+    if (recipe.hasImage) {
+      paintPhoto('loading');
+      loadRecipeImage(recipe.id).then(function (url) {
+        if (!photoBlock.isConnected) return;
+        if (url) paintPhoto('image', url);
+        else paintPhoto('empty', null, 'Fant ikke bildet. Er du uten nett?');
+      });
+    } else {
+      paintPhoto('empty');
+    }
+
     /* Glideren skalerer mengdene. Den endrer ikke selve oppskriften – den
      * står igjen som den er neste gang du åpner den. */
     var factor = 1;
@@ -2206,6 +2300,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       steps: normalizeSteps(data.steps),
       rating: normalizeRating(data.rating),
       ratedAt: normalizeRating(data.rating) ? now : 0,
+      hasImage: false,
+      imageAt: 0,
       createdAt: now,
       updatedAt: now
     });
@@ -2229,6 +2325,91 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     scheduleSave();
   }
 
+  /* ============================== bilder ============================== */
+
+  /* Bildet krympes i nettleseren på telefonen før noe sendes. Et mobilbilde på
+   * fire megabyte blir til rundt hundre kilobyte – rikelig for en telefonskjerm,
+   * og raskt å laste på dårlig dekning. */
+  var IMAGE_MAX_SIDE = 900;
+  var IMAGE_QUALITY = 0.7;
+
+  function compressImage (file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type || '')) {
+        reject(new Error('Filen er ikke et bilde.'));
+        return;
+      }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Klarte ikke å lese filen.')); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Klarte ikke å åpne bildet.')); };
+        img.onload = function () {
+          var w = img.naturalWidth || img.width;
+          var h = img.naturalHeight || img.height;
+          if (!w || !h) { reject(new Error('Bildet har ingen størrelse.')); return; }
+          var scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(w, h));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.round(w * scale);
+          canvas.height = Math.round(h * scale);
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          try {
+            resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY));
+          } catch (e) {
+            reject(new Error('Klarte ikke å komprimere bildet.'));
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* Hentede bilder holdes i minnet så lenge appen er åpen, slik at det ikke
+   * lastes ned på nytt hver gang du åpner den samme oppskriften. */
+  var imageCache = {};
+
+  function imageRef (recipeId) {
+    if (!fbDb) return null;
+    return doc(fbDb, IMAGE_COLLECTION, recipeId);
+  }
+
+  function loadRecipeImage (recipeId) {
+    if (Object.prototype.hasOwnProperty.call(imageCache, recipeId)) {
+      return Promise.resolve(imageCache[recipeId]);
+    }
+    var ref = imageRef(recipeId);
+    if (!ref) return Promise.resolve(null);
+    return getDoc(ref).then(function (snap) {
+      var data = snap.exists() ? snap.data() : null;
+      var url = (data && typeof data.data === 'string' && data.data) ? data.data : null;
+      imageCache[recipeId] = url;
+      return url;
+    }).catch(function () { return null; });
+  }
+
+  function saveRecipeImage (recipeId, dataUrl) {
+    var ref = imageRef(recipeId);
+    if (!ref) return Promise.reject(new Error('Ikke tilkoblet.'));
+    var now = Date.now();
+    return setDoc(ref, { data: dataUrl, updatedAt: now }).then(function () {
+      imageCache[recipeId] = dataUrl || null;
+      var recipe = findRecipe(recipeId);
+      if (recipe) {
+        recipe.hasImage = !!dataUrl;
+        recipe.imageAt = now;
+        scheduleSave();
+      }
+    });
+  }
+
+  /* Tomt dokument i stedet for sletting: da slipper vi å importere enda en
+   * funksjon fra Firebase, og et tomt dokument tar ingen plass av betydning. */
+  function clearRecipeImage (recipeId) {
+    return saveRecipeImage(recipeId, '');
+  }
+
   function setRecipeRating (id, value) {
     var recipe = findRecipe(id);
     if (!recipe) return;
@@ -2239,6 +2420,11 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   function deleteRecipe (id) {
+    var recipe = findRecipe(id);
+    /* Slettes oppskriften, skal bildet bort også – ellers blir det liggende og
+     * ta plass uten at noe peker på det. */
+    if (recipe && recipe.hasImage) clearRecipeImage(id).catch(function () {});
+    delete imageCache[id];
     tombstone('recipes', id);
     state.recipes = state.recipes.filter(function (r) { return r.id !== id; });
     render();
