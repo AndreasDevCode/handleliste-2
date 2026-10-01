@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '011020261316';
+  var APP_VERSION = '011020262219';
 
   /* ============================== styling ============================== */
 
@@ -400,6 +400,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  display:block;width:100%;text-align:left;border:0;background:transparent;',
     '  padding:0;margin:0 0 12px;cursor:pointer;font:inherit;color:inherit;',
     '}',
+    '.recipe-open.has-thumb{display:flex;gap:12px;align-items:flex-start;}',
+    '.recipe-open-text{flex:1;min-width:0;}',
+    '.recipe-thumb{',
+    '  flex:none;width:72px;height:72px;border-radius:var(--radius-md);',
+    '  background:var(--surface-2);overflow:hidden;',
+    '}',
+    '.recipe-thumb img{width:100%;height:100%;object-fit:cover;display:block;}',
     '.recipe-facts{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
 
     /* --- søk, sortering og terningkast --- */
@@ -1572,6 +1579,19 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       el('div', { class: 'recipe-card-actions' }, [editBtn, delBtn])
     ]);
 
+    /* Miniatyren hentes etterpå, slik at listen tegnes med én gang og bildene
+     * sklir inn etter hvert. Første gang koster det ett lite nedlasting per
+     * oppskrift; deretter ligger de på telefonen. */
+    var thumbEl = null;
+    if (recipe.hasImage) {
+      thumbEl = el('div', { class: 'recipe-thumb' });
+      loadRecipeThumb(recipe.id, recipe.imageAt).then(function (url) {
+        if (!thumbEl.isConnected || !url) return;
+        thumbEl.appendChild(el('img', { src: url, alt: 'Bilde av ' + recipe.name }));
+        thumbEl.classList.add('is-loaded');
+      });
+    }
+
     var preview = recipe.ingredients.map(ingredientLabel).join(', ');
 
     var facts = [];
@@ -1584,11 +1604,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
     addBtn.addEventListener('click', function () { applyRecipeToActiveList(recipe); });
 
-    var body = el('button', { type: 'button', class: 'recipe-open' }, [
+    var text = el('div', { class: 'recipe-open-text' }, [
       facts.length ? factsRow : null,
       el('p', { class: 'recipe-ing-preview', text: preview || 'Ingen ingredienser' }),
       recipe.steps.length ? el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' }) : null
     ]);
+    var body = el('button', { type: 'button', class: 'recipe-open' + (thumbEl ? ' has-thumb' : '') },
+      thumbEl ? [thumbEl, text] : [text]);
     body.addEventListener('click', function () { showRecipeReader(recipe); });
 
     return el('div', { class: 'recipe-card' }, [head, body, addBtn]);
@@ -1698,7 +1720,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         delBtn.addEventListener('click', function () {
           paintPhoto('loading');
           clearRecipeImage(recipe.id)
-            .then(function () { paintPhoto('empty'); })
+            .then(function () { paintPhoto('empty'); render(); })
             .catch(function () { paintPhoto('image', url, 'Klarte ikke å fjerne bildet.'); });
         });
         photoBlock.appendChild(el('div', { class: 'photo-actions' }, [swapBtn, delBtn]));
@@ -1717,9 +1739,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       if (!file) return;
       if (!isWriter) { paintPhoto(recipe.hasImage ? 'image' : 'empty', imageCache[recipe.id], 'Du må være tilkoblet for å lagre bilder.'); return; }
       paintPhoto('loading');
-      compressImage(file)
-        .then(function (dataUrl) { return saveRecipeImage(recipe.id, dataUrl).then(function () { return dataUrl; }); })
-        .then(function (dataUrl) { paintPhoto('image', dataUrl); })
+      Promise.all([
+        compressImage(file, IMAGE_MAX_SIDE, IMAGE_QUALITY),
+        compressImage(file, THUMB_MAX_SIDE, THUMB_QUALITY)
+      ])
+        .then(function (pair) {
+          return saveRecipeImage(recipe.id, pair[0], pair[1]).then(function () { return pair[0]; });
+        })
+        .then(function (dataUrl) { paintPhoto('image', dataUrl); render(); })
         .catch(function (err) {
           paintPhoto(recipe.hasImage ? 'image' : 'empty', imageCache[recipe.id],
             (err && err.message) || 'Klarte ikke å lagre bildet.');
@@ -2332,8 +2359,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * og raskt å laste på dårlig dekning. */
   var IMAGE_MAX_SIDE = 900;
   var IMAGE_QUALITY = 0.7;
+  /* Miniatyren ligger i sitt eget dokument, slik at oppskriftslisten kan hente
+   * bare den – 23 miniatyrer er noen hundre kilobyte, mot flere megabyte om vi
+   * hadde måttet laste ned alle de store bildene for å bla gjennom listen. */
+  var THUMB_MAX_SIDE = 320;
+  var THUMB_QUALITY = 0.6;
+  var THUMB_SUFFIX = '__mini';
+  var THUMB_CACHE_PREFIX = 'handleliste_mini_';
 
-  function compressImage (file) {
+  function compressImage (file, maxSide, quality) {
+    maxSide = maxSide || IMAGE_MAX_SIDE;
+    quality = quality || IMAGE_QUALITY;
     return new Promise(function (resolve, reject) {
       if (!file || !/^image\//.test(file.type || '')) {
         reject(new Error('Filen er ikke et bilde.'));
@@ -2348,14 +2384,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
           var w = img.naturalWidth || img.width;
           var h = img.naturalHeight || img.height;
           if (!w || !h) { reject(new Error('Bildet har ingen størrelse.')); return; }
-          var scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(w, h));
+          var scale = Math.min(1, maxSide / Math.max(w, h));
           var canvas = document.createElement('canvas');
           canvas.width = Math.round(w * scale);
           canvas.height = Math.round(h * scale);
           var ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           try {
-            resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY));
+            resolve(canvas.toDataURL('image/jpeg', quality));
           } catch (e) {
             reject(new Error('Klarte ikke å komprimere bildet.'));
           }
@@ -2374,6 +2410,53 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!fbDb) return null;
     return doc(fbDb, IMAGE_COLLECTION, recipeId);
   }
+  function thumbRef (recipeId) {
+    if (!fbDb) return null;
+    /* Samme samling som det store bildet, så sikkerhetsreglene dekker begge. */
+    return doc(fbDb, IMAGE_COLLECTION, recipeId + THUMB_SUFFIX);
+  }
+
+  /* Miniatyrene lagres på telefonen, slik at listen bare henter hvert bilde
+   * én gang – deretter blar du gjennom uten å bruke mobildata i det hele tatt. */
+  function readCachedThumb (recipeId, imageAt) {
+    try {
+      var raw = localStorage.getItem(THUMB_CACHE_PREFIX + recipeId);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || obj.at !== imageAt) return null;
+      return obj.data || null;
+    } catch (e) { return null; }
+  }
+  function writeCachedThumb (recipeId, imageAt, dataUrl) {
+    try {
+      localStorage.setItem(THUMB_CACHE_PREFIX + recipeId, JSON.stringify({ at: imageAt, data: dataUrl }));
+    } catch (e) {
+      /* Fullt lager: kast alle miniatyrer og prøv én gang til. De hentes
+       * uansett ned igjen ved behov. */
+      try {
+        Object.keys(localStorage).forEach(function (k) {
+          if (k.indexOf(THUMB_CACHE_PREFIX) === 0) localStorage.removeItem(k);
+        });
+        localStorage.setItem(THUMB_CACHE_PREFIX + recipeId, JSON.stringify({ at: imageAt, data: dataUrl }));
+      } catch (e2) {}
+    }
+  }
+  function clearCachedThumb (recipeId) {
+    try { localStorage.removeItem(THUMB_CACHE_PREFIX + recipeId); } catch (e) {}
+  }
+
+  function loadRecipeThumb (recipeId, imageAt) {
+    var cached = readCachedThumb(recipeId, imageAt);
+    if (cached) return Promise.resolve(cached);
+    var ref = thumbRef(recipeId);
+    if (!ref) return Promise.resolve(null);
+    return getDoc(ref).then(function (snap) {
+      var data = snap.exists() ? snap.data() : null;
+      var url = (data && typeof data.data === 'string' && data.data) ? data.data : null;
+      if (url) writeCachedThumb(recipeId, imageAt, url);
+      return url;
+    }).catch(function () { return null; });
+  }
 
   function loadRecipeImage (recipeId) {
     if (Object.prototype.hasOwnProperty.call(imageCache, recipeId)) {
@@ -2389,12 +2472,18 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     }).catch(function () { return null; });
   }
 
-  function saveRecipeImage (recipeId, dataUrl) {
+  function saveRecipeImage (recipeId, dataUrl, thumbUrl) {
     var ref = imageRef(recipeId);
-    if (!ref) return Promise.reject(new Error('Ikke tilkoblet.'));
+    var tRef = thumbRef(recipeId);
+    if (!ref || !tRef) return Promise.reject(new Error('Ikke tilkoblet.'));
     var now = Date.now();
-    return setDoc(ref, { data: dataUrl, updatedAt: now }).then(function () {
+    return Promise.all([
+      setDoc(ref, { data: dataUrl, updatedAt: now }),
+      setDoc(tRef, { data: thumbUrl || '', updatedAt: now })
+    ]).then(function () {
       imageCache[recipeId] = dataUrl || null;
+      if (thumbUrl) writeCachedThumb(recipeId, now, thumbUrl);
+      else clearCachedThumb(recipeId);
       var recipe = findRecipe(recipeId);
       if (recipe) {
         recipe.hasImage = !!dataUrl;
@@ -2404,10 +2493,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     });
   }
 
-  /* Tomt dokument i stedet for sletting: da slipper vi å importere enda en
-   * funksjon fra Firebase, og et tomt dokument tar ingen plass av betydning. */
+  /* Tomme dokumenter i stedet for sletting: da slipper vi å importere enda en
+   * funksjon fra Firebase, og tomme dokumenter tar ingen plass av betydning. */
   function clearRecipeImage (recipeId) {
-    return saveRecipeImage(recipeId, '');
+    return saveRecipeImage(recipeId, '', '');
   }
 
   function setRecipeRating (id, value) {
@@ -2425,6 +2514,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
      * ta plass uten at noe peker på det. */
     if (recipe && recipe.hasImage) clearRecipeImage(id).catch(function () {});
     delete imageCache[id];
+    clearCachedThumb(id);
     tombstone('recipes', id);
     state.recipes = state.recipes.filter(function (r) { return r.id !== id; });
     render();
