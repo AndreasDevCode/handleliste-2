@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '011020262236';
+  var APP_VERSION = '021020260012';
 
   /* ============================== styling ============================== */
 
@@ -407,7 +407,16 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  background:var(--surface-2);overflow:hidden;',
     '}',
     '.recipe-thumb img{width:100%;height:100%;object-fit:cover;display:block;}',
-    '.recipe-facts{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
+    '.time-badge{display:inline-flex;align-items:center;gap:4px;}',
+    '.time-icon{display:inline-flex;align-items:center;}',
+    '.reader-time{',
+    '  display:flex;align-items:center;justify-content:center;gap:5px;',
+    '  font-size:13px;color:var(--muted);margin:2px 0 10px;',
+    '}',
+    '.field-grid{display:flex;gap:10px;margin-bottom:12px;}',
+    '.field-grid .field-row{flex:1;margin:0;}',
+    '.field-grid .portions-input, .field-grid .minutes-input{width:100%;min-width:0;}',
+    '.recipe-facts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}',
 
     /* --- søk, sortering og terningkast --- */
     '.recipe-search{',
@@ -528,7 +537,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.field-label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px;}',
     '.field-row .field-label{margin:0;flex:none;}',
     '.field-hint{display:block;font-size:12px;color:var(--muted);margin-top:6px;}',
-    '.portions-input{',
+    '.portions-input, .minutes-input{',
     '  width:72px;padding:9px 10px;border-radius:var(--radius-sm);border:1px solid var(--line);',
     '  background:var(--surface);color:var(--ink);font-family:inherit;font-size:15px;',
     '}',
@@ -910,6 +919,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       id: a.id,
       name: base.name,
       portions: base.portions,
+      minutes: base.minutes,
       ingredients: base.ingredients,
       steps: base.steps,
       rating: rated.rating,
@@ -959,6 +969,40 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     else if (typeof raw === 'string' && /\d/.test(raw)) n = parseInt(raw.match(/\d+/)[0], 10);
     if (n === null || n < 1 || n > 6) return null;
     return n;
+  }
+
+  /* Omtrentlig tid retten tar, i minutter. */
+  function normalizeMinutes (raw) {
+    var n = null;
+    if (typeof raw === 'number' && isFinite(raw)) n = Math.round(raw);
+    else if (typeof raw === 'string' && /\d/.test(raw)) n = parseDuration(raw);
+    if (n === null || n < 1) return null;
+    return Math.min(1440, n);
+  }
+
+  /* Tåler «45 min», «1 t 15 min», «1,5 time» og bare «90». */
+  function parseDuration (text) {
+    if (typeof text === 'number') return isFinite(text) ? Math.round(text) : null;
+    var t = (text || '').toString().toLowerCase();
+    if (!/\d/.test(t)) return null;
+    var total = 0, found = false;
+    var h = t.match(/(\d+(?:[.,]\d+)?)\s*(?:t\b|time|timer)/);
+    if (h) { total += parseFloat(h[1].replace(',', '.')) * 60; found = true; }
+    var m = t.match(/(\d+)\s*(?:min|minutt)/);
+    if (m) { total += parseInt(m[1], 10); found = true; }
+    if (!found) {
+      var n = t.match(/\d+/);
+      if (n) { total = parseInt(n[0], 10); found = true; }
+    }
+    return found ? Math.round(total) : null;
+  }
+
+  function formatDuration (minutes) {
+    if (!minutes) return '';
+    if (minutes < 60) return minutes + ' min';
+    var h = Math.floor(minutes / 60);
+    var m = minutes % 60;
+    return m ? (h + ' t ' + m + ' min') : (h + ' t');
   }
 
   function normalizePortions (raw) {
@@ -1113,6 +1157,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
           id: (r && r.id) || uid(),
           name: normalizeName(r && r.name) || 'Oppskrift',
           portions: normalizePortions(r && r.portions),
+          minutes: normalizeMinutes(r && r.minutes),
           ingredients: normalizeIngredients(r && r.ingredients),
           steps: normalizeSteps(r && r.steps),
           rating: normalizeRating(r && r.rating),
@@ -1200,6 +1245,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ICON_PENCIL = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
   var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
   var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
+  var ICON_CLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.8"></path></svg>';
+
   /* Terning med riktig antall øyne, tegnet som SVG. */
   var DIE_PIPS = {
     1: [[12, 12]],
@@ -1638,6 +1685,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (recipe.steps.length) facts.push(recipe.steps.length + ' steg');
 
     var factsRow = el('div', { class: 'recipe-facts' });
+    if (recipe.minutes) {
+      factsRow.appendChild(el('span', { class: 'time-badge' }, [
+        el('span', { class: 'time-icon', html: ICON_CLOCK }),
+        el('span', { text: 'ca. ' + formatDuration(recipe.minutes) })
+      ]));
+    }
     if (facts.length) factsRow.appendChild(el('span', { text: facts.join(' · ') }));
 
     var addBtn = el('button', { type: 'button', class: 'recipe-add-btn', text: 'Legg til i «' + activeList.name + '»' });
@@ -1646,7 +1699,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var text = el('div', { class: 'recipe-open-text' }, [
       facts.length ? factsRow : null,
       preview ? el('p', { class: 'recipe-ing-preview', text: preview }) : null,
-      recipe.steps.length ? el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' }) : null
+      el('span', { class: 'recipe-open-hint', text: 'Se hele oppskriften' })
     ]);
     var body = el('button', { type: 'button', class: 'recipe-open' + (thumbEl ? ' has-thumb' : '') },
       thumbEl ? [thumbEl, text] : [text]);
@@ -1739,6 +1792,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     titleEl.appendChild(readerDie);
 
     var kids = [titleEl];
+
+    if (recipe.minutes) {
+      kids.push(el('div', { class: 'reader-time' }, [
+        el('span', { class: 'time-icon', html: ICON_CLOCK }),
+        el('span', { text: 'ca. ' + formatDuration(recipe.minutes) })
+      ]));
+    }
 
     /* Bildeblokken. Den bytter mellom tre tilstander: tom («Legg til bilde»),
      * henter, og ferdig bilde med knapper for å bytte eller fjerne. */
@@ -2005,6 +2065,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var draft = {
       name: existing ? existing.name : '',
       portions: existing && existing.portions ? String(existing.portions) : '',
+      minutes: existing && existing.minutes ? String(existing.minutes) : '',
       steps: existing && existing.steps.length ? existing.steps.join('\n') : '',
       ingredients: existing && existing.ingredients.length
         ? existing.ingredients.map(function (i) { return { name: i.name, qty: i.qty, amount: i.amount || '', counted: !!i.counted }; })
@@ -2016,9 +2077,18 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
     var portionsInput = el('input', { type: 'number', class: 'portions-input', placeholder: '4', min: '1', max: '99', value: draft.portions });
     portionsInput.addEventListener('input', function () { draft.portions = portionsInput.value; });
-    var portionsRow = el('label', { class: 'field-row' }, [
-      el('span', { class: 'field-label', text: 'Porsjoner' }),
-      portionsInput
+    var minutesInput = el('input', { type: 'number', class: 'minutes-input', placeholder: '45', min: '1', max: '1440', value: draft.minutes });
+    minutesInput.addEventListener('input', function () { draft.minutes = minutesInput.value; });
+
+    var portionsRow = el('div', { class: 'field-grid' }, [
+      el('label', { class: 'field-row' }, [
+        el('span', { class: 'field-label', text: 'Porsjoner' }),
+        portionsInput
+      ]),
+      el('label', { class: 'field-row' }, [
+        el('span', { class: 'field-label', text: 'Tid (min)' }),
+        minutesInput
+      ])
     ]);
 
     var rowsContainer = el('div', { class: 'ingredient-rows' });
@@ -2111,6 +2181,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       var data = {
         name: name,
         portions: draft.portions,
+        minutes: draft.minutes,
         ingredients: draft.ingredients,
         steps: draft.steps.split('\n')
       };
@@ -2162,6 +2233,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
        * trykker – særlig mengdene, som er lettest å lese feil. */
       parsed.forEach(function (r) {
         var facts = [];
+        if (r.minutes) facts.push('ca. ' + formatDuration(r.minutes));
         if (r.portions) facts.push(r.portions + ' porsjoner');
         facts.push(r.ingredients.length + ' ingredienser');
         if (r.steps.length) facts.push(r.steps.length + ' steg');
@@ -2362,6 +2434,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       id: uid(),
       name: data.name,
       portions: normalizePortions(data.portions),
+      minutes: normalizeMinutes(data.minutes),
       ingredients: normalizeIngredients(data.ingredients),
       steps: normalizeSteps(data.steps),
       rating: normalizeRating(data.rating),
@@ -2381,6 +2454,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!recipe) return;
     recipe.name = data.name;
     recipe.portions = normalizePortions(data.portions);
+    recipe.minutes = normalizeMinutes(data.minutes);
     recipe.ingredients = normalizeIngredients(data.ingredients);
     recipe.steps = normalizeSteps(data.steps);
     /* Terningkastet røres ikke her – det settes for seg, og skal overleve at
@@ -2573,6 +2647,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var HEAD_ING = /^(?:ingredienser|ingrediensar|du trenger|dette trenger du|varer)\s*:?\s*$/i;
   var HEAD_STEP = /^(?:fremgangsm[åa]te|framgangsm[åa]te|slik gj[øo]r du(?: det)?|slik lager du det|metode|steg|oppskrift|tilberedning)\s*:?\s*$/i;
   var PORTIONS_RE = /^(?:porsjoner?|antall porsjoner|serverer)\s*:?\s*(\d+)/i;
+  var TIME_RE = /^(?:tid|tilberedningstid|koketid|steketid|total ?tid)\s*:?\s*(.+)$/i;
   var PORTIONS_ALT_RE = /^(\d+)\s*porsjoner?\.?$/i;
 
   function stripBullet (line) {
@@ -2604,7 +2679,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var section = 'ingredients';
 
     function start (name) {
-      current = { name: normalizeName(name) || 'Oppskrift', portions: null, ingredients: [], steps: [] };
+      current = { name: normalizeName(name) || 'Oppskrift', portions: null, minutes: null, ingredients: [], steps: [] };
       section = 'ingredients';
       recipes.push(current);
     }
@@ -2627,6 +2702,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
       var p = line.match(PORTIONS_RE) || line.match(PORTIONS_ALT_RE);
       if (p) { current.portions = normalizePortions(p[1]); return; }
+
+      var t = line.match(TIME_RE);
+      if (t) { current.minutes = normalizeMinutes(t[1]); return; }
 
       if (HEAD_ING.test(line)) { section = 'ingredients'; return; }
       if (HEAD_STEP.test(line)) { section = 'steps'; return; }
