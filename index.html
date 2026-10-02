@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '021020262237';
+  var APP_VERSION = '021020262315';
 
   /* ============================== styling ============================== */
 
@@ -410,6 +410,32 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  color:var(--accent-strong);cursor:pointer;display:flex;align-items:center;justify-content:center;',
     '}',
     '.menu-day-add:active{background:var(--accent);color:var(--accent-ink);}',
+    '.menu-mini-row{display:flex;gap:8px;margin:-6px 0 12px;}',
+    '.menu-mini-btn{',
+    '  flex:1;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);',
+    '  font:inherit;font-weight:600;font-size:12.5px;color:var(--accent);padding:9px;cursor:pointer;',
+    '}',
+    '.menu-mini-btn:active{background:var(--surface-2);}',
+    '.menu-mini-btn:disabled{color:var(--muted);background:transparent;border-style:dashed;cursor:default;}',
+    '.saved-row-wrap{display:flex;align-items:stretch;gap:6px;}',
+    '.saved-row{',
+    '  flex:1;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;',
+    '  border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);',
+    '  font:inherit;font-size:14px;color:inherit;padding:10px 12px;cursor:pointer;',
+    '}',
+    '.saved-row:active{background:var(--surface-2);}',
+    '.saved-del{flex:none;align-self:center;}',
+    '.saved-name-input{width:100%;}',
+    '.plan-modal form{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}',
+    '.menu-hint{margin:-6px 0 12px;font-size:12px;color:var(--muted);text-align:center;}',
+    /* Mens en dag dras skal ingenting annet reagere på fingeren. */
+    '.menu-days.is-reordering{user-select:none;-webkit-user-select:none;}',
+    '.menu-days.is-reordering .menu-day{transition:none;}',
+    '.menu-day.is-dragging{',
+    '  position:relative;z-index:5;box-shadow:0 10px 22px rgba(0,0,0,.18);',
+    '  border-color:var(--accent);cursor:grabbing;',
+    '}',
+    '.menu-day.is-drop-target{border-color:var(--accent);background:var(--accent-soft);}',
     '.menu-flash{',
     '  position:absolute;right:56px;bottom:8px;background:var(--accent);color:var(--accent-ink);',
     '  font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;pointer-events:none;',
@@ -432,6 +458,31 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.menu-pick-meta{flex:none;font-size:11.5px;color:var(--muted);}',
     '.menu-pick-row.is-chosen .menu-pick-meta{color:var(--accent-strong);}',
     '.menu-pick-empty{font-size:13.5px;color:var(--muted);text-align:center;padding:14px 0;}',
+
+    /* --- sette en rett på ukesmenyen fra oppskriften --- */
+    '.plan-block{margin:16px 0 4px;}',
+    '.plan-btn{',
+    '  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;',
+    '  border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);',
+    '  font:inherit;font-weight:600;font-size:13.5px;color:var(--accent);padding:11px;cursor:pointer;',
+    '}',
+    '.plan-btn:active{background:var(--surface-2);}',
+    '.plan-btn-icon{display:inline-flex;}',
+    '.plan-status{margin:7px 0 0;font-size:12.5px;color:var(--muted);text-align:center;}',
+    '.plan-day-list{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;margin-bottom:14px;}',
+    '.plan-day-list .menu-field-label{margin:8px 0 2px;}',
+    '.plan-day-list .menu-field-label:first-child{margin-top:0;}',
+    '.plan-day-row{',
+    '  display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;',
+    '  border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);',
+    '  font:inherit;font-size:14px;color:inherit;padding:10px 12px;cursor:pointer;',
+    '}',
+    '.plan-day-row:active{background:var(--surface-2);}',
+    '.plan-day-row.is-chosen{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong);font-weight:600;}',
+    '.plan-day-name{min-width:0;}',
+    '.plan-day-meta{flex:none;font-size:11.5px;color:var(--ink-soft);max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+    '.plan-day-meta.is-free{color:var(--muted);}',
+    '.plan-day-row.is-chosen .plan-day-meta{color:var(--accent-strong);}',
 
     '.recipe-list{display:flex;flex-direction:column;gap:10px;}',
     '.recipe-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow);}',
@@ -935,11 +986,61 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       .sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
   }
 
-  function emptyTombstones () { return { lists: {}, items: {}, recipes: {} }; }
+  /* ---------- lagrede ukesmenyer ----------
+   * En lagret uke er et oppsett du kan hente fram igjen: sju dager med rett og
+   * notat. Den peker på oppskriftene, så retter som er slettet siden du lagret
+   * hoppes over når uken settes inn igjen. */
+
+  function normalizeSavedDays (raw) {
+    var out = [];
+    for (var d = 0; d < 7; d++) {
+      var src = (Array.isArray(raw) && raw[d]) || {};
+      out.push({
+        recipeId: normalizeName(src.recipeId).slice(0, 40),
+        recipeName: normalizeName(src.recipeName).slice(0, 80),
+        note: normalizeName(src.note).slice(0, 80)
+      });
+    }
+    return out;
+  }
+  function normalizeSavedMenu (raw, idx) {
+    var name = normalizeName(raw && raw.name).slice(0, 40);
+    if (!name) return null;
+    var created = num(raw && raw.createdAt, idx + 1);
+    return {
+      id: (raw && raw.id) || uid(),
+      name: name,
+      days: normalizeSavedDays(raw && raw.days),
+      createdAt: created,
+      updatedAt: num(raw && raw.updatedAt, created)
+    };
+  }
+  function normalizeSavedMenus (raw) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function (m, idx) {
+      var menu = normalizeSavedMenu(m, idx);
+      if (menu) out.push(menu);
+    });
+    return out;
+  }
+  /* En lagret uke redigeres sjelden, så det holder med én klokke for hele. */
+  function mergeSavedMenus (a, b) {
+    var base = pickNewer(a, b, 'updatedAt');
+    return {
+      id: a.id,
+      name: base.name,
+      days: base.days,
+      createdAt: Math.min(a.createdAt, b.createdAt),
+      updatedAt: Math.max(a.updatedAt, b.updatedAt)
+    };
+  }
+
+  function emptyTombstones () { return { lists: {}, items: {}, recipes: {}, savedMenus: {} }; }
 
   function normalizeTombstones (raw) {
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes'].forEach(function (kind) {
+    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
       var src = raw && raw[kind];
       if (!src || typeof src !== 'object') return;
       Object.keys(src).forEach(function (id) {
@@ -951,7 +1052,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
   function mergeTombstones (a, b) {
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes'].forEach(function (kind) {
+    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
       [a && a[kind], b && b[kind]].forEach(function (src) {
         if (!src) return;
         Object.keys(src).forEach(function (id) {
@@ -964,7 +1065,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function pruneTombstones (tomb) {
     var cutoff = Date.now() - TOMBSTONE_TTL;
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes'].forEach(function (kind) {
+    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
       Object.keys(tomb[kind]).forEach(function (id) {
         if (tomb[kind][id] >= cutoff) out[kind][id] = tomb[kind][id];
       });
@@ -1028,7 +1129,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var recipes = s.recipes
       .filter(function (r) { return !tomb.recipes[r.id]; })
       .sort(byField('createdAt'));
-    return { lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), tombstones: tomb };
+    var savedMenus = (s.savedMenus || [])
+      .filter(function (m) { return !tomb.savedMenus[m.id]; })
+      .sort(byField('createdAt'));
+    return { lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), savedMenus: savedMenus, tombstones: tomb };
   }
 
   /* Den aller første listen får en FAST id. Ellers ville de to telefonene laget
@@ -1038,6 +1142,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   function ensureAtLeastOneList (s) {
     if (!Array.isArray(s.menu)) s.menu = [];
+    if (!Array.isArray(s.savedMenus)) s.savedMenus = [];
     if (!s.lists.length) {
       s.lists.push({ id: DEFAULT_LIST_ID, name: 'Handleliste', createdAt: 0, updatedAt: 0, items: [] });
     }
@@ -1118,6 +1223,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       lists: mergeById(mine.lists, theirs.lists, mergeLists),
       recipes: mergeById(mine.recipes, theirs.recipes, mergeRecipes),
       menu: mergeById(mine.menu || [], theirs.menu || [], mergeMenuDays),
+      savedMenus: mergeById(mine.savedMenus || [], theirs.savedMenus || [], mergeSavedMenus),
       tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
     }));
   }
@@ -1360,11 +1466,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       lists: lists,
       recipes: recipes,
       menu: normalizeMenu(raw && raw.menu),
+      savedMenus: normalizeSavedMenus(raw && raw.savedMenus),
       tombstones: normalizeTombstones(raw && raw.tombstones)
     });
   }
 
-  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], tombstones: emptyTombstones() });
+  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], savedMenus: [], tombstones: emptyTombstones() });
   var activeListId = getStoredActiveListId();
 
   function ensureActiveList () {
@@ -1449,6 +1556,21 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     entry.recipeName = recipe ? recipe.name : '';
     entry.updatedAt = Date.now();
   }
+  /* Bytter middagene på to dager. Er den ene dagen tom, blir det i praksis en
+   * ren flytting – det er samme operasjon sett fra to sider. Notatene blir
+   * liggende på sin dag: «ute og spiser» hører til dagen, ikke til retten. */
+  function swapMenuDishes (weekKey, dayA, dayB) {
+    if (dayA === dayB) return false;
+    var a = ensureMenuDay(weekKey, dayA);
+    var b = ensureMenuDay(weekKey, dayB);
+    if (!a.recipeId && !b.recipeId) return false;
+    var aId = a.recipeId, aName = a.recipeName;
+    var now = Date.now();
+    a.recipeId = b.recipeId; a.recipeName = b.recipeName; a.updatedAt = now;
+    b.recipeId = aId; b.recipeName = aName; b.updatedAt = now;
+    return true;
+  }
+
   function setMenuNote (weekKey, day, note) {
     var clean = normalizeName(note).slice(0, 80);
     var entry = findMenuDay(weekKey, day);
@@ -1459,6 +1581,97 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     entry.noteAt = Date.now();
     return true;
   }
+  /* Dagene du kan sette en rett på herfra: resten av denne uken, og hele neste.
+   * Dager som allerede er passert tas ikke med – du planlegger framover. */
+  function menuPlacementDays () {
+    var today = dateOnly(new Date());
+    var out = [];
+    menuWeeks().forEach(function (week, idx) {
+      for (var day = 0; day < 7; day++) {
+        var date = addDays(week.start, day);
+        if (idx === 0 && date < today) continue;
+        out.push({ week: week, day: day, date: date });
+      }
+    });
+    return out;
+  }
+
+  /* Hvor denne retten allerede står i de to ukene vi viser. */
+  function menuSlotsForRecipe (recipeId) {
+    var out = [];
+    if (!recipeId) return out;
+    menuWeeks().forEach(function (week) {
+      for (var day = 0; day < 7; day++) {
+        if (getMenuDay(week.key, day).recipeId === recipeId) {
+          out.push({ week: week, day: day, date: addDays(week.start, day) });
+        }
+      }
+    });
+    return out;
+  }
+
+  function shortDayLabel (slot) {
+    return DAY_NAMES[slot.day].toLowerCase() + ' ' + slot.date.getDate() + '. ' + MONTH_SHORT[slot.date.getMonth()];
+  }
+
+  /* ---------- lagre og hente igjen en uke ---------- */
+
+  function weekHasPlan (weekKey) {
+    for (var d = 0; d < 7; d++) {
+      var e = getMenuDay(weekKey, d);
+      if (e.recipeId || e.note) return true;
+    }
+    return false;
+  }
+  function weekAsSavedDays (weekKey) {
+    var days = [];
+    for (var d = 0; d < 7; d++) {
+      var e = getMenuDay(weekKey, d);
+      days.push({ recipeId: e.recipeId, recipeName: e.recipeName, note: e.note });
+    }
+    return days;
+  }
+  function saveWeekAs (weekKey, name) {
+    state.savedMenus.push({
+      id: uid(), name: name, days: weekAsSavedDays(weekKey),
+      createdAt: nextCreatedAt(), updatedAt: Date.now()
+    });
+  }
+  function overwriteSavedMenu (menu, weekKey) {
+    menu.days = weekAsSavedDays(weekKey);
+    menu.updatedAt = Date.now();
+  }
+  /* Setter en lagret uke inn på den uken du står på. Retter som er slettet i
+   * mellomtiden hoppes over – da står dagen tom i stedet for å peke i løse
+   * luften. */
+  function applySavedMenu (menu, weekKey) {
+    var now = Date.now();
+    var placed = 0, missing = 0;
+    for (var d = 0; d < 7; d++) {
+      var src = menu.days[d] || { recipeId: '', recipeName: '', note: '' };
+      var entry = ensureMenuDay(weekKey, d);
+      var recipe = src.recipeId ? findRecipe(src.recipeId) : null;
+      if (src.recipeId && !recipe) missing++;
+      entry.recipeId = recipe ? recipe.id : '';
+      entry.recipeName = recipe ? recipe.name : '';
+      entry.updatedAt = now;
+      entry.note = src.note;
+      entry.noteAt = now;
+      if (recipe) placed++;
+    }
+    return { placed: placed, missing: missing };
+  }
+  function savedMenuSummary (menu) {
+    var dishes = 0, gone = 0;
+    menu.days.forEach(function (d) {
+      if (!d.recipeId) return;
+      if (findRecipe(d.recipeId)) dishes++; else gone++;
+    });
+    var txt = dishes + (dishes === 1 ? ' middag' : ' middager');
+    if (gone) txt += ' · ' + gone + ' slettet';
+    return txt;
+  }
+
   /* Dagene i uken som faktisk har en middag som fortsatt finnes. */
   function plannedDays (weekKey) {
     var out = [];
@@ -1495,7 +1708,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
   var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
   var ICON_CLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.8"></path></svg>';
-  var ICON_CHEVRON_LEFT = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>';
+  var ICON_MOVE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M12 3L9 6M12 3l3 3M12 21l-3-3M12 21l3-3"></path></svg>';
+  var ICON_CALENDAR ='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>';
+  var ICON_CHEVRON_LEFT ='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>';
   var ICON_CHEVRON_RIGHT = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>';
   var ICON_CAMERA ='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h3l1.6-2.4h8.8L18 8.5h3v11H3Z"></path><circle cx="12" cy="13.6" r="3.4"></circle></svg>';
   var ICON_GALLERY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.6"></circle><path d="M4 17.5l4.8-4.3 3.4 2.9 3-2.6 4.3 4"></path></svg>';
@@ -1873,6 +2088,24 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     weekBtn.addEventListener('click', function () { confirmAddWeekToList(activeList, week); });
     section.appendChild(weekBtn);
 
+    /* Lagre uken du har satt opp, og hent fram igjen en du har lagret før. */
+    var saveBtn = el('button', {
+      type: 'button', class: 'menu-mini-btn', text: 'Lagre uken',
+      disabled: !weekHasPlan(week.key)
+    });
+    saveBtn.addEventListener('click', function () { showSaveWeekModal(week); });
+    var loadBtn = el('button', {
+      type: 'button', class: 'menu-mini-btn',
+      text: state.savedMenus.length ? 'Lagrede uker (' + state.savedMenus.length + ')' : 'Lagrede uker',
+      disabled: state.savedMenus.length === 0
+    });
+    loadBtn.addEventListener('click', function () { showSavedMenusModal(week); });
+    section.appendChild(el('div', { class: 'menu-mini-row' }, [saveBtn, loadBtn]));
+
+    if (planned.length >= 2) {
+      section.appendChild(el('p', { class: 'menu-hint', text: 'Hold inne en dag for å dra middagen til en annen dag.' }));
+    }
+
     var today = dateOnly(new Date());
     var daysEl = el('div', { class: 'menu-days' });
     for (var day = 0; day < 7; day++) {
@@ -1917,9 +2150,15 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (entry.note) kids.push(el('div', { class: 'menu-day-note', text: entry.note }));
 
     var main = el('button', { type: 'button', class: 'menu-day-main' }, kids);
-    main.addEventListener('click', function () { showMenuDayModal(week, day, date); });
+    main.addEventListener('click', function () {
+      /* Et trykk som egentlig var en flytting skal ikke åpne dagen etterpå. */
+      if (dragJustEnded) return;
+      showMenuDayModal(week, day, date);
+    });
 
     var card = el('div', { class: 'menu-day' + (sameDay(date, today) ? ' is-today' : '') }, [main]);
+    card.setAttribute('data-day', String(day));
+    if (recipe || entry.recipeId) attachMenuDrag(card, main, week, day);
 
     if (recipe) {
       var addBtn = el('button', {
@@ -1934,6 +2173,109 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       card.appendChild(addBtn);
     }
     return card;
+  }
+
+  /* ---------- dra en middag til en annen dag ----------
+   * På telefon må vi skille mellom «jeg blar i listen» og «jeg vil flytte
+   * denne dagen». Derfor starter flyttingen først når fingeren har ligget
+   * stille på dagen en liten stund; beveger du den før det, er det bla.
+   * Med mus finnes ikke den tvetydigheten, og dragingen starter med én gang. */
+
+  var LONG_PRESS_MS = 220;
+  var DRAG_SLOP = 9;
+  var dragJustEnded = false;
+
+  function attachMenuDrag (card, handle, week, day) {
+    var holdTimer = null, startY = 0, dragging = false;
+    var offset = 0, boxes = [], target = null, pointerId = null;
+
+    /* Mens vi drar må siden slutte å bla med fingeren. */
+    function blockScroll (e) { e.preventDefault(); }
+
+    function cleanup () {
+      clearTimeout(holdTimer);
+      document.removeEventListener('touchmove', blockScroll);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      card.classList.remove('is-dragging');
+      card.style.transform = '';
+      var parent = card.parentNode;
+      if (parent) {
+        parent.classList.remove('is-reordering');
+        Array.prototype.forEach.call(parent.children, function (c) { c.classList.remove('is-drop-target'); });
+      }
+      dragging = false;
+      target = null;
+      pointerId = null;
+    }
+
+    function beginDrag () {
+      dragging = true;
+      var parent = card.parentNode;
+      boxes = Array.prototype.map.call(parent.children, function (c) {
+        var r = c.getBoundingClientRect();
+        return { node: c, day: Number(c.getAttribute('data-day')), top: r.top, bottom: r.bottom };
+      });
+      card.classList.add('is-dragging');
+      parent.classList.add('is-reordering');
+      document.addEventListener('touchmove', blockScroll, { passive: false });
+    }
+
+    function paintTarget (y) {
+      target = null;
+      boxes.forEach(function (b) {
+        b.node.classList.remove('is-drop-target');
+        if (b.node !== card && y >= b.top && y <= b.bottom) target = b;
+      });
+      if (target) target.node.classList.add('is-drop-target');
+    }
+
+    function onMove (e) {
+      if (pointerId !== null && e.pointerId !== pointerId) return;
+      var dy = e.clientY - startY;
+      if (!dragging) {
+        /* Fingeren beveget seg før flyttingen rakk å starte – da blar du. */
+        if (Math.abs(dy) > DRAG_SLOP) {
+          if (e.pointerType === 'mouse') { clearTimeout(holdTimer); beginDrag(); }
+          else { cleanup(); return; }
+        } else return;
+      }
+      offset = dy;
+      card.style.transform = 'translateY(' + offset + 'px)';
+      paintTarget(e.clientY);
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function onUp () {
+      if (!dragging) { cleanup(); return; }
+      var to = target ? target.day : null;
+      cleanup();
+      if (to === null || to === day) return;
+      if (!swapMenuDishes(week.key, day, to)) return;
+      /* Uten dette ville slippet også talt som et trykk og åpnet dagen. */
+      dragJustEnded = true;
+      setTimeout(function () { dragJustEnded = false; }, 350);
+      scheduleSave();
+      render();
+    }
+
+    function onCancel () { cleanup(); }
+
+    handle.addEventListener('pointerdown', function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      pointerId = e.pointerId;
+      startY = e.clientY;
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onCancel);
+      if (e.pointerType !== 'mouse') {
+        holdTimer = setTimeout(function () {
+          beginDrag();
+          card.style.transform = 'translateY(0px)';
+        }, LONG_PRESS_MS);
+      }
+    });
   }
 
   /* Liten kvittering på selve dagen. Da slipper du å bli kastet over i
@@ -2035,6 +2377,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       search,
       listEl
     ];
+
+    /* Flytting uten å dra – både for den som heller vil trykke, og fordi en
+     * dra-og-slipp aldri skal være eneste vei til noe. */
+    if (entry.recipeId) {
+      var moveBtn = el('button', { type: 'button', class: 'plan-btn' }, [
+        el('span', { class: 'plan-btn-icon', html: ICON_MOVE }),
+        el('span', { text: 'Flytt til en annen dag' })
+      ]);
+      moveBtn.addEventListener('click', function () { showMenuMoveModal(week, day); });
+      modalKids.splice(2, 0, el('div', { class: 'plan-block' }, [moveBtn]));
+    }
 
     var actions = [];
     if (entry.recipeId) {
@@ -2449,6 +2802,23 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       kids.push(ol);
     }
 
+    /* Ukesmenyen rett fra oppskriften: leser du gjennom en rett og liker den,
+     * skal du slippe å finne fram til ukesmenyen og lete opp retten på nytt. */
+    var planned = menuSlotsForRecipe(recipe.id);
+    var planBtn = el('button', { type: 'button', class: 'plan-btn' }, [
+      el('span', { class: 'plan-btn-icon', html: ICON_CALENDAR }),
+      el('span', { text: planned.length ? 'Sett opp på en dag til' : 'Sett på ukesmenyen' })
+    ]);
+    planBtn.addEventListener('click', function () { showMenuPlacementModal(recipe); });
+    var planKids = [planBtn];
+    if (planned.length) {
+      planKids.push(el('p', {
+        class: 'plan-status',
+        text: 'Står på ' + planned.map(shortDayLabel).join(' og ') + '.'
+      }));
+    }
+    kids.push(el('div', { class: 'plan-block' }, planKids));
+
     var addBtn = el('button', { class: 'primary', type: 'button', text: 'Legg i handlelisten' });
     addBtn.addEventListener('click', function () { closeOverlay(); applyRecipeToActiveList(recipe, factor); });
     var editBtn = el('button', { class: 'secondary', type: 'button', text: 'Rediger' });
@@ -2468,6 +2838,259 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     modal.insertBefore(closeBtn, modal.firstChild);
     var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+  }
+
+  /* Lagre uken slik den står nå – enten som en ny, eller over en du har fra før. */
+  function showSaveWeekModal (week) {
+    closeOverlay();
+    var input = el('input', {
+      type: 'text', class: 'saved-name-input', maxlength: '40', autocomplete: 'off',
+      placeholder: 'F.eks. «Standarduken» eller «Uke med fisk»'
+    });
+    var saveBtn = el('button', { class: 'primary', type: 'submit', text: 'Lagre' });
+    var form = el('form', {}, [input, saveBtn]);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = input.value.trim();
+      if (!name) return;
+      saveWeekAs(week.key, name);
+      scheduleSave();
+      closeOverlay();
+      render();
+    });
+
+    var kids = [
+      el('h2', { text: 'Lagre uken' }),
+      el('p', { text: 'Uken lagres med rett og notat på hver dag, og kan settes inn igjen på en senere uke.' }),
+      form
+    ];
+
+    if (state.savedMenus.length) {
+      kids.push(el('span', { class: 'menu-field-label', text: 'Eller skriv over en du har fra før' }));
+      var rows = el('div', { class: 'plan-day-list' });
+      state.savedMenus.forEach(function (m) {
+        var row = el('button', { type: 'button', class: 'plan-day-row' }, [
+          el('span', { class: 'plan-day-name', text: m.name }),
+          el('span', { class: 'plan-day-meta is-free', text: savedMenuSummary(m) })
+        ]);
+        row.addEventListener('click', function () {
+          showConfirmModal({
+            title: 'Skrive over «' + m.name + '»?',
+            description: 'Den lagrede uken erstattes av uken du står på nå.',
+            confirmLabel: 'Skriv over',
+            cancelLabel: 'Avbryt',
+            onConfirm: function () { overwriteSavedMenu(m, week.key); scheduleSave(); render(); },
+            onCancel: function () { showSaveWeekModal(week); }
+          });
+        });
+        rows.appendChild(row);
+      });
+      kids.push(rows);
+    }
+
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
+    cancelBtn.addEventListener('click', closeOverlay);
+    kids.push(el('div', { class: 'modal-actions' }, [cancelBtn]));
+
+    var modal = el('div', { class: 'modal wide plan-modal' }, kids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+    setTimeout(function () { input.focus(); }, 30);
+  }
+
+  /* De lagrede ukene: trykk på en for å sette den inn på uken du står på. */
+  function showSavedMenusModal (week) {
+    closeOverlay();
+    var rows = el('div', { class: 'plan-day-list' });
+
+    state.savedMenus.forEach(function (m) {
+      var useBtn = el('button', { type: 'button', class: 'saved-row' }, [
+        el('span', { class: 'plan-day-name', text: m.name }),
+        el('span', { class: 'plan-day-meta is-free', text: savedMenuSummary(m) })
+      ]);
+      useBtn.addEventListener('click', function () { confirmApplySavedMenu(m, week); });
+
+      var delBtn = el('button', {
+        type: 'button', class: 'tab-icon-btn saved-del',
+        'aria-label': 'Slett den lagrede uken ' + m.name, html: ICON_TRASH
+      });
+      delBtn.addEventListener('click', function () {
+        showConfirmModal({
+          title: 'Slette «' + m.name + '»?',
+          description: 'Den lagrede uken fjernes. Ukene du allerede har satt opp berøres ikke.',
+          confirmLabel: 'Slett',
+          cancelLabel: 'Avbryt',
+          danger: true,
+          onConfirm: function () {
+            tombstone('savedMenus', m.id);
+            state.savedMenus = state.savedMenus.filter(function (x) { return x.id !== m.id; });
+            scheduleSave();
+            render();
+            if (state.savedMenus.length) showSavedMenusModal(week);
+          },
+          onCancel: function () { showSavedMenusModal(week); }
+        });
+      });
+      rows.appendChild(el('div', { class: 'saved-row-wrap' }, [useBtn, delBtn]));
+    });
+
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
+    cancelBtn.addEventListener('click', closeOverlay);
+
+    var modal = el('div', { class: 'modal wide plan-modal' }, [
+      el('h2', { text: 'Lagrede uker' }),
+      el('p', { text: 'Settes inn på ' + week.label.toLowerCase() + ' – uke ' + isoWeek(week.start).week + '.' }),
+      rows,
+      el('div', { class: 'modal-actions' }, [cancelBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+  }
+
+  function confirmApplySavedMenu (menu, week) {
+    function run () {
+      var res = applySavedMenu(menu, week.key);
+      scheduleSave();
+      closeOverlay();
+      render();
+      if (res.missing) {
+        showConfirmModal({
+          title: 'Uken er satt inn',
+          description: res.missing + ' av rettene i «' + menu.name + '» finnes ikke lenger, så de dagene står tomme.',
+          confirmLabel: 'Greit',
+          cancelLabel: 'Lukk',
+          onConfirm: function () {}
+        });
+      }
+    }
+    if (!weekHasPlan(week.key)) { run(); return; }
+    showConfirmModal({
+      title: 'Erstatte det som står der nå?',
+      description: week.label + ' har allerede et oppsett. «' + menu.name + '» skriver over alle sju dagene.',
+      confirmLabel: 'Sett inn',
+      cancelLabel: 'Avbryt',
+      onConfirm: run,
+      onCancel: function () { showSavedMenusModal(week); }
+    });
+  }
+
+  /* Flytt middagen fra én dag til en annen i samme uke. Står det noe på dagen
+   * du flytter til, bytter de to dagene plass – det er nesten alltid det du
+   * mener når du drar om på en uke. */
+  function showMenuMoveModal (week, fromDay) {
+    closeOverlay();
+    var from = getMenuDay(week.key, fromDay);
+    var moving = findRecipe(from.recipeId);
+    var rows = [];
+    for (var d = 0; d < 7; d++) {
+      (function (toDay) {
+        if (toDay === fromDay) return;
+        var entry = getMenuDay(week.key, toDay);
+        var taken = entry.recipeId ? findRecipe(entry.recipeId) : null;
+        var date = addDays(week.start, toDay);
+        var row = el('button', { type: 'button', class: 'plan-day-row' }, [
+          el('span', { class: 'plan-day-name', text: DAY_NAMES[toDay] + ' ' + date.getDate() + '. ' + MONTH_SHORT[date.getMonth()] }),
+          el('span', { class: 'plan-day-meta' + (taken ? '' : ' is-free'), text: taken ? 'Bytter med ' + taken.name : 'Ledig' })
+        ]);
+        row.addEventListener('click', function () {
+          if (swapMenuDishes(week.key, fromDay, toDay)) scheduleSave();
+          closeOverlay();
+          render();
+        });
+        rows.push(row);
+      })(d);
+    }
+
+    var backBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
+    backBtn.addEventListener('click', closeOverlay);
+
+    var modal = el('div', { class: 'modal wide plan-modal' }, [
+      el('h2', { text: 'Flytt middagen' }),
+      el('p', { text: (moving ? moving.name : from.recipeName) + ' står på ' + DAY_NAMES[fromDay].toLowerCase() + '.' }),
+      el('div', { class: 'plan-day-list' }, rows),
+      el('div', { class: 'modal-actions' }, [backBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+  }
+
+  /* Velger dag for en rett du allerede står og ser på. Resten av denne uken og
+   * hele neste – og dagen retten allerede står på kan trykkes bort igjen. */
+  function showMenuPlacementModal (recipe) {
+    closeOverlay();
+
+    function finish () {
+      scheduleSave();
+      render();
+      /* Tilbake til oppskriften, som nå selv forteller hvilken dag den står på. */
+      showRecipeReader(recipe);
+    }
+
+    function place (slot) {
+      var entry = getMenuDay(slot.week.key, slot.day);
+      if (entry.recipeId === recipe.id) {
+        setMenuDish(slot.week.key, slot.day, null);
+        finish();
+        return;
+      }
+      var taken = entry.recipeId ? findRecipe(entry.recipeId) : null;
+      if (taken && taken.id !== recipe.id) {
+        /* Å overskrive en middag noen allerede har planlagt skal koste ett trykk til. */
+        showConfirmModal({
+          title: 'Bytte middag?',
+          description: DAY_NAMES[slot.day] + ' ' + slot.date.getDate() + '. ' +
+            MONTH_NAMES[slot.date.getMonth()] + ' står det «' + taken.name +
+            '». Vil du sette «' + recipe.name + '» der i stedet?',
+          confirmLabel: 'Bytt',
+          cancelLabel: 'Avbryt',
+          onConfirm: function () { setMenuDish(slot.week.key, slot.day, recipe); finish(); },
+          onCancel: function () { showMenuPlacementModal(recipe); }
+        });
+        return;
+      }
+      setMenuDish(slot.week.key, slot.day, recipe);
+      finish();
+    }
+
+    var rows = [];
+    var lastWeekKey = null;
+    menuPlacementDays().forEach(function (slot) {
+      if (slot.week.key !== lastWeekKey) {
+        lastWeekKey = slot.week.key;
+        rows.push(el('span', {
+          class: 'menu-field-label',
+          text: slot.week.label + ' · uke ' + isoWeek(slot.week.start).week
+        }));
+      }
+      var entry = getMenuDay(slot.week.key, slot.day);
+      var isHere = entry.recipeId === recipe.id;
+      var taken = entry.recipeId ? findRecipe(entry.recipeId) : null;
+      var meta = isHere ? 'Står her – trykk for å fjerne'
+        : (taken ? taken.name : (entry.recipeId ? entry.recipeName + ' (slettet)' : 'Ledig'));
+
+      var row = el('button', { type: 'button', class: 'plan-day-row' + (isHere ? ' is-chosen' : '') }, [
+        el('span', { class: 'plan-day-name', text: DAY_NAMES[slot.day] + ' ' + slot.date.getDate() + '. ' + MONTH_SHORT[slot.date.getMonth()] }),
+        el('span', { class: 'plan-day-meta' + (isHere || taken ? '' : ' is-free'), text: meta })
+      ]);
+      row.addEventListener('click', function () { place(slot); });
+      rows.push(row);
+    });
+
+    var backBtn = el('button', { class: 'secondary', type: 'button', text: 'Tilbake' });
+    backBtn.addEventListener('click', function () { closeOverlay(); showRecipeReader(recipe); });
+
+    var modal = el('div', { class: 'modal wide plan-modal' }, [
+      el('h2', { text: 'Sett på ukesmenyen' }),
+      el('p', { text: recipe.name }),
+      el('div', { class: 'plan-day-list' }, rows),
+      el('div', { class: 'modal-actions' }, [backBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) { closeOverlay(); showRecipeReader(recipe); } });
     document.body.appendChild(overlay);
   }
 
@@ -2513,7 +3136,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     closeOverlay();
     var cancelBtn = el('button', { class: 'secondary', type: 'button', text: opts.cancelLabel || 'Avbryt' });
     var confirmBtn = el('button', { class: 'primary' + (opts.danger ? ' danger' : ''), type: 'button', text: opts.confirmLabel || 'Bekreft' });
-    cancelBtn.addEventListener('click', closeOverlay);
+    cancelBtn.addEventListener('click', function () { closeOverlay(); if (opts.onCancel) opts.onCancel(); });
     confirmBtn.addEventListener('click', function () { closeOverlay(); opts.onConfirm(); });
     var actions = el('div', { class: 'modal-actions' }, [cancelBtn, confirmBtn]);
     var modalKids = [el('h2', { text: opts.title })];
