@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '021020261333';
+  var APP_VERSION = '021020261403';
 
   /* ============================== styling ============================== */
 
@@ -467,7 +467,19 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '}',
     '.photo-empty.is-button{cursor:pointer;}',
     '.photo-empty.is-button:active{background:var(--surface-2);color:var(--ink-soft);}',
-    '.photo-actions{display:flex;gap:14px;justify-content:center;margin-top:8px;}',
+    /* Tom boks med to valg: kamera eller galleri. Høyden følger innholdet –
+     * et fast sideforhold ga en unødvendig stor, tom rute på telefonen. */
+    '.photo-empty.photo-pick{flex-direction:column;gap:10px;aspect-ratio:auto;padding:16px 12px;}',
+    '.photo-pick-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}',
+    '.photo-btn{',
+    '  display:inline-flex;align-items:center;gap:7px;',
+    '  border:1px solid var(--line);border-radius:999px;background:var(--surface);',
+    '  padding:9px 15px;cursor:pointer;',
+    '  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--accent);',
+    '}',
+    '.photo-btn:active{background:var(--surface-2);}',
+    '.photo-btn svg{flex:none;}',
+    '.photo-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px;}',
     '.photo-link{',
     '  border:0;background:transparent;padding:4px 2px;cursor:pointer;',
     '  font-family:inherit;font-size:13px;font-weight:600;color:var(--accent);',
@@ -1248,6 +1260,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
   var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
   var ICON_CLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.8"></path></svg>';
+  var ICON_CAMERA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h3l1.6-2.4h8.8L18 8.5h3v11H3Z"></path><circle cx="12" cy="13.6" r="3.4"></circle></svg>';
+  var ICON_GALLERY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.6"></circle><path d="M4 17.5l4.8-4.3 3.4 2.9 3-2.6 4.3 4"></path></svg>';
 
   /* Terning med riktig antall øyne, tegnet som SVG. */
   var DIE_PIPS = {
@@ -1807,6 +1821,24 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var photoBlock = el('div', { class: 'photo-block' });
     var fileInput = el('input', { type: 'file', accept: 'image/*', class: 'photo-input' });
 
+    /* Samme felt brukes til begge valgene. «capture» er det som ber telefonen
+     * om å åpne kameraet i stedet for galleriet – det må settes rett før
+     * klikket, og fjernes igjen når du vil velge et bilde du allerede har. */
+    function openPicker (useCamera) {
+      if (useCamera) fileInput.setAttribute('capture', 'environment');
+      else fileInput.removeAttribute('capture');
+      fileInput.click();
+    }
+
+    function pickButton (useCamera, label, icon, extraClass) {
+      var btn = el('button', { type: 'button', class: 'photo-btn' + (extraClass ? ' ' + extraClass : '') }, [
+        el('span', { class: 'photo-btn-icon', html: icon }),
+        el('span', { text: label })
+      ]);
+      btn.addEventListener('click', function () { openPicker(useCamera); });
+      return btn;
+    }
+
     function paintPhoto (state_, url, message) {
       photoBlock.innerHTML = '';
       if (state_ === 'loading') {
@@ -1815,8 +1847,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       }
       if (state_ === 'image') {
         photoBlock.appendChild(el('img', { class: 'photo', src: url, alt: 'Bilde av ' + recipe.name }));
-        var swapBtn = el('button', { type: 'button', class: 'photo-link', text: 'Bytt bilde' });
-        swapBtn.addEventListener('click', function () { fileInput.click(); });
+        var camBtn = el('button', { type: 'button', class: 'photo-link take-photo', text: 'Ta nytt bilde' });
+        camBtn.addEventListener('click', function () { openPicker(true); });
+        var swapBtn = el('button', { type: 'button', class: 'photo-link from-gallery', text: 'Fra galleri' });
+        swapBtn.addEventListener('click', function () { openPicker(false); });
         var delBtn = el('button', { type: 'button', class: 'photo-link danger', text: 'Fjern' });
         delBtn.addEventListener('click', function () {
           paintPhoto('loading');
@@ -1824,13 +1858,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
             .then(function () { paintPhoto('empty'); render(); })
             .catch(function () { paintPhoto('image', url, 'Klarte ikke å fjerne bildet.'); });
         });
-        photoBlock.appendChild(el('div', { class: 'photo-actions' }, [swapBtn, delBtn]));
+        photoBlock.appendChild(el('div', { class: 'photo-actions' }, [camBtn, swapBtn, delBtn]));
         if (message) photoBlock.appendChild(el('p', { class: 'field-error', text: message }));
         return;
       }
-      var addBtn = el('button', { type: 'button', class: 'photo-empty is-button', text: '+ Legg til bilde' });
-      addBtn.addEventListener('click', function () { fileInput.click(); });
-      photoBlock.appendChild(addBtn);
+      photoBlock.appendChild(el('div', { class: 'photo-empty photo-pick' }, [
+        el('span', { class: 'photo-pick-title', text: 'Bilde av retten' }),
+        el('div', { class: 'photo-pick-row' }, [
+          pickButton(true, 'Ta bilde', ICON_CAMERA, 'take-photo'),
+          pickButton(false, 'Velg fra galleri', ICON_GALLERY, 'from-gallery')
+        ])
+      ]));
       if (message) photoBlock.appendChild(el('p', { class: 'field-error', text: message }));
     }
 
