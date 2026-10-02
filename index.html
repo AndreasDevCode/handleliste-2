@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '021020260012';
+  var APP_VERSION = '021020261333';
 
   /* ============================== styling ============================== */
 
@@ -1093,7 +1093,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     [/kalkun/, 'Kalkun'],
     [/pekingand|andebryst|andel(å|a)r/, 'And'],
     [/svinek|ribbe|nakkekotelett|koteletter|skinke/, 'Svin'],
-    [/lammel(å|a)r|lammestek|lammekj(ø|o)tt|\blam\b/, 'Lam'],
+    [/lammel(å|a)r|lammestek|lammekj(ø|o)tt|lammeskav|lammestrimler|\blam\b/, 'Lam'],
+    [/reinsdyr|reinskav/, 'Reinsdyr'],
+    [/\belg\b|elgkj(ø|o)tt|\bhjort|r(å|a)dyr|\bvilt/, 'Vilt'],
     [/storfe|h(ø|o)yrygg|oksekj(ø|o)tt|\bokse|biff|entrec(ô|o)te|indrefilet|ytrefilet/, 'Storfe'],
     [/bacon|guanciale|pancetta/, 'Bacon'],
     [/p(ø|o)lse|chorizo/, 'Pølse'],
