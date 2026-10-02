@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '021020261403';
+  var APP_VERSION = '021020262237';
 
   /* ============================== styling ============================== */
 
@@ -364,6 +364,75 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  color:var(--ink-soft); font:inherit; font-weight:600; font-size:13.5px; cursor:pointer; box-shadow:var(--shadow);',
     '}',
     '.view-switch button.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}',
+    /* --- ukesmeny --- */
+    '.week-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;}',
+    '.week-nav{',
+    '  flex:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;',
+    '  border:1px solid var(--line);border-radius:12px;background:var(--surface);',
+    '  color:var(--accent);cursor:pointer;box-shadow:var(--shadow);',
+    '}',
+    '.week-nav:disabled{opacity:.3;cursor:default;box-shadow:none;}',
+    '.week-title{flex:1;text-align:center;line-height:1.3;}',
+    '.week-title strong{display:block;font-size:15px;}',
+    '.week-title span{display:block;font-size:12.5px;color:var(--muted);}',
+    '.menu-week-btn{',
+    '  width:100%;border:none;background:var(--accent-soft);color:var(--accent-strong);',
+    '  font:inherit;font-weight:600;font-size:13.5px;padding:12px;border-radius:var(--radius-sm);',
+    '  cursor:pointer;margin-bottom:14px;',
+    '}',
+    '.menu-week-btn:active{background:var(--accent);color:var(--accent-ink);}',
+    '.menu-week-btn:disabled{background:transparent;border:1px dashed var(--line);color:var(--muted);cursor:default;}',
+    '.menu-days{display:flex;flex-direction:column;gap:8px;}',
+    '.menu-day{',
+    '  position:relative;display:flex;align-items:stretch;gap:0;',
+    '  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);',
+    '  box-shadow:var(--shadow);overflow:hidden;',
+    '}',
+    /* Dagen i dag får en markering i kanten – da ser du med én gang hvor i uken du er. */
+    '.menu-day.is-today{border-color:var(--accent);}',
+    '.menu-day.is-today::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}',
+    '.menu-day-main{',
+    '  flex:1;min-width:0;text-align:left;border:0;background:transparent;',
+    '  font:inherit;color:inherit;padding:11px 12px;cursor:pointer;',
+    '}',
+    '.menu-day-main:active{background:var(--surface-2);}',
+    '.menu-day-head{display:flex;align-items:baseline;gap:7px;margin-bottom:2px;}',
+    '.menu-day-name{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);}',
+    '.menu-day-date{font-size:11.5px;color:var(--muted);}',
+    '.menu-day-dish{font-size:15px;font-weight:600;word-break:break-word;}',
+    '.menu-dish-name.is-empty{color:var(--muted);font-weight:500;}',
+    '.menu-dish-name.is-gone{color:var(--muted);font-weight:500;text-decoration:line-through;}',
+    '.die-mark{display:inline-flex;vertical-align:-3px;margin-left:6px;color:var(--accent);}',
+    '.menu-day-meta{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:12px;color:var(--muted);}',
+    '.menu-day-note{margin-top:4px;font-size:12.5px;color:var(--ink-soft);font-style:italic;word-break:break-word;}',
+    '.menu-day-add{',
+    '  flex:none;width:48px;border:0;border-left:1px solid var(--line);background:var(--accent-soft);',
+    '  color:var(--accent-strong);cursor:pointer;display:flex;align-items:center;justify-content:center;',
+    '}',
+    '.menu-day-add:active{background:var(--accent);color:var(--accent-ink);}',
+    '.menu-flash{',
+    '  position:absolute;right:56px;bottom:8px;background:var(--accent);color:var(--accent-ink);',
+    '  font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;pointer-events:none;',
+    '}',
+    '.menu-day-modal > p{text-align:center;}',
+    '.menu-day-modal .menu-note-input,.menu-day-modal .menu-pick-search{width:100%;margin-bottom:10px;}',
+    '.menu-field-label{',
+    '  display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;',
+    '  color:var(--muted);margin:2px 0 6px;',
+    '}',
+    '.menu-pick-list{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto;margin-bottom:14px;}',
+    '.menu-pick-row{',
+    '  display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;',
+    '  border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);',
+    '  font:inherit;font-size:14px;color:inherit;padding:10px 12px;cursor:pointer;',
+    '}',
+    '.menu-pick-row:active{background:var(--surface-2);}',
+    '.menu-pick-row.is-chosen{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong);font-weight:600;}',
+    '.menu-pick-name{min-width:0;word-break:break-word;}',
+    '.menu-pick-meta{flex:none;font-size:11.5px;color:var(--muted);}',
+    '.menu-pick-row.is-chosen .menu-pick-meta{color:var(--accent-strong);}',
+    '.menu-pick-empty{font-size:13.5px;color:var(--muted);text-align:center;padding:14px 0;}',
+
     '.recipe-list{display:flex;flex-direction:column;gap:10px;}',
     '.recipe-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow);}',
     '.recipe-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;}',
@@ -766,6 +835,106 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return out;
   }
 
+  /* ============================== ukesmeny: datoer ==============================
+   * Uken går fra mandag til søndag. Alt regnes ut fra mandagen, og hver uke får
+   * en nøkkel som «2026-W41». Nøkkelen sorterer riktig som ren tekst, også over
+   * et årsskifte – det er derfor den brukes til å rydde bort gamle uker. */
+
+  var DAY_NAMES = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'];
+  var DAY_SHORT = ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn'];
+  var MONTH_NAMES = ['januar', 'februar', 'mars', 'april', 'mai', 'juni',
+                     'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+  var MONTH_SHORT = ['jan.', 'feb.', 'mars', 'apr.', 'mai', 'juni',
+                     'juli', 'aug.', 'sep.', 'okt.', 'nov.', 'des.'];
+
+  function dateOnly (d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function addDays (d, n) {
+    var t = dateOnly(d);
+    t.setDate(t.getDate() + n);
+    return t;
+  }
+  function mondayOf (d) {
+    var t = dateOnly(d);
+    return addDays(t, -((t.getDay() + 6) % 7));
+  }
+  /* ISO-ukenummer: uken tilhører det året torsdagen i uken ligger i. Det er
+   * derfor nyttårsuken kan hete «uke 1» selv om den begynner i desember. */
+  function isoWeek (d) {
+    var thu = addDays(mondayOf(d), 3);
+    var firstThu = addDays(mondayOf(new Date(thu.getFullYear(), 0, 4)), 3);
+    return { year: thu.getFullYear(), week: 1 + Math.round((thu - firstThu) / 604800000) };
+  }
+  function pad2 (n) { return n < 10 ? '0' + n : String(n); }
+  function weekKeyOf (d) { var w = isoWeek(d); return w.year + '-W' + pad2(w.week); }
+  function menuDayId (weekKey, day) { return weekKey + '-' + day; }
+  function sameDay (a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  /* Gamle uker rydder seg selv bort. Vi venter to uker i stedet for å kaste
+   * uken med en gang den er over: da spiller det ingen rolle om de to
+   * telefonene er litt uenige om hva klokken er. */
+  var MENU_KEEP_WEEKS = 2;
+  function oldestKeptWeekKey () { return weekKeyOf(addDays(new Date(), -7 * MENU_KEEP_WEEKS)); }
+
+  /* En dag i menyen. Id-en er regnet ut av uke + ukedag, ikke tilfeldig, slik at
+   * begge telefonene lager NØYAKTIG samme id for «onsdag i uke 41». Uten det
+   * ville hver telefon fått sin egen onsdag, og begge hadde blitt stående. */
+  function normalizeMenuDay (raw) {
+    var week = normalizeName(raw && raw.week);
+    var day = Math.round(num(raw && raw.day, -1));
+    if (!/^\d{4}-W\d{2}$/.test(week) || day < 0 || day > 6) return null;
+    return {
+      id: menuDayId(week, day),
+      week: week,
+      day: day,
+      recipeId: normalizeName(raw && raw.recipeId).slice(0, 40),
+      /* Navnet lagres ved siden av id-en, slik at menyen fortsatt kan vise hva
+       * som var planlagt selv om oppskriften er slettet i mellomtiden. */
+      recipeName: normalizeName(raw && raw.recipeName).slice(0, 80),
+      note: normalizeName(raw && raw.note).slice(0, 80),
+      updatedAt: num(raw && raw.updatedAt, 0),
+      noteAt: num(raw && raw.noteAt, 0)
+    };
+  }
+  function normalizeMenu (raw) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function (d) {
+      var day = normalizeMenuDay(d);
+      if (day) out.push(day);
+    });
+    return out;
+  }
+
+  /* Retten og notatet har hver sin klokke. Velger han middagen samtidig som hun
+   * skriver «rester» på samme dag, overlever begge deler. */
+  function mergeMenuDays (a, b) {
+    var dish = pickNewer(a, b, 'updatedAt');
+    var note = pickNewer(a, b, 'noteAt');
+    return {
+      id: a.id,
+      week: a.week,
+      day: a.day,
+      recipeId: dish.recipeId,
+      recipeName: dish.recipeName,
+      note: note.note,
+      updatedAt: Math.max(a.updatedAt, b.updatedAt),
+      noteAt: Math.max(a.noteAt, b.noteAt)
+    };
+  }
+
+  /* En tømt dag blir liggende som en tom rad med tidsstempel. Den ER
+   * gravsteinen: kastet vi den, ville den andre telefonens kopi av middagen
+   * komme tilbake ved neste sammenslåing. */
+  function canonicalMenu (menu) {
+    var cutoff = oldestKeptWeekKey();
+    return (menu || [])
+      .filter(function (d) { return d.week >= cutoff; })
+      .filter(function (d) { return d.recipeId || d.note || d.updatedAt || d.noteAt; })
+      .sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+  }
+
   function emptyTombstones () { return { lists: {}, items: {}, recipes: {} }; }
 
   function normalizeTombstones (raw) {
@@ -859,7 +1028,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var recipes = s.recipes
       .filter(function (r) { return !tomb.recipes[r.id]; })
       .sort(byField('createdAt'));
-    return { lists: lists, recipes: recipes, tombstones: tomb };
+    return { lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), tombstones: tomb };
   }
 
   /* Den aller første listen får en FAST id. Ellers ville de to telefonene laget
@@ -868,6 +1037,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var DEFAULT_LIST_ID = 'liste-1';
 
   function ensureAtLeastOneList (s) {
+    if (!Array.isArray(s.menu)) s.menu = [];
     if (!s.lists.length) {
       s.lists.push({ id: DEFAULT_LIST_ID, name: 'Handleliste', createdAt: 0, updatedAt: 0, items: [] });
     }
@@ -947,6 +1117,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return ensureAtLeastOneList(canonicalState({
       lists: mergeById(mine.lists, theirs.lists, mergeLists),
       recipes: mergeById(mine.recipes, theirs.recipes, mergeRecipes),
+      menu: mergeById(mine.menu || [], theirs.menu || [], mergeMenuDays),
       tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
     }));
   }
@@ -1188,11 +1359,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return canonicalState({
       lists: lists,
       recipes: recipes,
+      menu: normalizeMenu(raw && raw.menu),
       tombstones: normalizeTombstones(raw && raw.tombstones)
     });
   }
 
-  var state = ensureAtLeastOneList({ lists: [], recipes: [], tombstones: emptyTombstones() });
+  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], tombstones: emptyTombstones() });
   var activeListId = getStoredActiveListId();
 
   function ensureActiveList () {
@@ -1230,10 +1402,73 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var draftName = '';
   var draftQty = 1;
   var currentView = 'lists';
+  /* 0 = denne uken, 1 = neste uke. Du begynner alltid på denne uken. */
+  var menuWeekOffset = 0;
 
   function setView (v) {
     currentView = v;
     render();
+  }
+
+  /* ============================== ukesmeny: tilstand ============================== */
+
+  function menuWeeks () {
+    var mon = mondayOf(new Date());
+    return [
+      { key: weekKeyOf(mon), start: mon, label: 'Denne uken' },
+      { key: weekKeyOf(addDays(mon, 7)), start: addDays(mon, 7), label: 'Neste uke' }
+    ];
+  }
+  function currentMenuWeek () { return menuWeeks()[menuWeekOffset] || menuWeeks()[0]; }
+
+  function findMenuDay (weekKey, day) {
+    var id = menuDayId(weekKey, day);
+    for (var i = 0; i < state.menu.length; i++) {
+      if (state.menu[i].id === id) return state.menu[i];
+    }
+    return null;
+  }
+  /* Henter dagen, eller en tom dag som ikke er lagt inn i tilstanden ennå –
+   * sju tomme rader skal ikke lagres bare fordi du åpnet ukesmenyen. */
+  function getMenuDay (weekKey, day) {
+    return findMenuDay(weekKey, day) || {
+      id: menuDayId(weekKey, day), week: weekKey, day: day,
+      recipeId: '', recipeName: '', note: '', updatedAt: 0, noteAt: 0
+    };
+  }
+  function ensureMenuDay (weekKey, day) {
+    var found = findMenuDay(weekKey, day);
+    if (found) return found;
+    var fresh = getMenuDay(weekKey, day);
+    state.menu.push(fresh);
+    return fresh;
+  }
+  function setMenuDish (weekKey, day, recipe) {
+    var entry = ensureMenuDay(weekKey, day);
+    entry.recipeId = recipe ? recipe.id : '';
+    entry.recipeName = recipe ? recipe.name : '';
+    entry.updatedAt = Date.now();
+  }
+  function setMenuNote (weekKey, day, note) {
+    var clean = normalizeName(note).slice(0, 80);
+    var entry = findMenuDay(weekKey, day);
+    if (!entry && !clean) return false;
+    entry = ensureMenuDay(weekKey, day);
+    if (entry.note === clean) return false;
+    entry.note = clean;
+    entry.noteAt = Date.now();
+    return true;
+  }
+  /* Dagene i uken som faktisk har en middag som fortsatt finnes. */
+  function plannedDays (weekKey) {
+    var out = [];
+    for (var day = 0; day < 7; day++) {
+      var entry = getMenuDay(weekKey, day);
+      if (!entry.recipeId) continue;
+      var recipe = findRecipe(entry.recipeId);
+      if (recipe) out.push({ day: day, entry: entry, recipe: recipe });
+    }
+    return out;
   }
 
   /* ============================== dom helpers ============================== */
@@ -1260,7 +1495,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   var ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
   var ICON_MINUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg>';
   var ICON_CLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.8"></path></svg>';
-  var ICON_CAMERA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h3l1.6-2.4h8.8L18 8.5h3v11H3Z"></path><circle cx="12" cy="13.6" r="3.4"></circle></svg>';
+  var ICON_CHEVRON_LEFT = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>';
+  var ICON_CHEVRON_RIGHT = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>';
+  var ICON_CAMERA ='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h3l1.6-2.4h8.8L18 8.5h3v11H3Z"></path><circle cx="12" cy="13.6" r="3.4"></circle></svg>';
   var ICON_GALLERY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.6"></circle><path d="M4 17.5l4.8-4.3 3.4 2.9 3-2.6 4.3 4"></path></svg>';
 
   /* Terning med riktig antall øyne, tegnet som SVG. */
@@ -1327,6 +1564,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
     if (currentView === 'recipes') {
       root.appendChild(buildRecipesView(list));
+    } else if (currentView === 'menu') {
+      root.appendChild(buildMenuView(list));
     } else {
       root.appendChild(buildTabsRow(list));
       root.appendChild(buildAddForm(list));
@@ -1397,10 +1636,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
 
   function buildViewSwitch () {
     var listsBtn = el('button', { type: 'button', class: currentView === 'lists' ? 'active' : '', text: 'Handlelister' });
+    var menuBtn = el('button', { type: 'button', class: currentView === 'menu' ? 'active' : '', text: 'Ukesmeny' });
     var recipesBtn = el('button', { type: 'button', class: currentView === 'recipes' ? 'active' : '', text: 'Oppskrifter' });
     listsBtn.addEventListener('click', function () { setView('lists'); });
+    menuBtn.addEventListener('click', function () { setView('menu'); });
     recipesBtn.addEventListener('click', function () { setView('recipes'); });
-    return el('div', { class: 'view-switch' }, [listsBtn, recipesBtn]);
+    return el('div', { class: 'view-switch' }, [listsBtn, menuBtn, recipesBtn]);
   }
 
   function itemsSummary (list) {
@@ -1576,6 +1817,240 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       });
     }
     return list;
+  }
+
+  /* ============================== ukesmeny: visning ============================== */
+
+  function weekRangeLabel (start) {
+    var end = addDays(start, 6);
+    if (start.getMonth() === end.getMonth()) {
+      return start.getDate() + '.–' + end.getDate() + '. ' + MONTH_NAMES[end.getMonth()];
+    }
+    return start.getDate() + '. ' + MONTH_SHORT[start.getMonth()] +
+           ' – ' + end.getDate() + '. ' + MONTH_SHORT[end.getMonth()];
+  }
+
+  function buildMenuView (activeList) {
+    var section = el('section', { class: 'list-section' });
+    var week = currentMenuWeek();
+
+    var prevBtn = el('button', {
+      type: 'button', class: 'week-nav', html: ICON_CHEVRON_LEFT,
+      'aria-label': 'Denne uken', disabled: menuWeekOffset === 0
+    });
+    var nextBtn = el('button', {
+      type: 'button', class: 'week-nav', html: ICON_CHEVRON_RIGHT,
+      'aria-label': 'Neste uke', disabled: menuWeekOffset === 1
+    });
+    prevBtn.addEventListener('click', function () { menuWeekOffset = 0; render(); });
+    nextBtn.addEventListener('click', function () { menuWeekOffset = 1; render(); });
+
+    section.appendChild(el('div', { class: 'week-head' }, [
+      prevBtn,
+      el('div', { class: 'week-title' }, [
+        el('strong', { text: week.label }),
+        el('span', { text: 'Uke ' + isoWeek(week.start).week + ' · ' + weekRangeLabel(week.start) })
+      ]),
+      nextBtn
+    ]));
+
+    if (state.recipes.length === 0) {
+      section.appendChild(el('div', { class: 'empty-state' }, [
+        el('h3', { text: 'Ingen oppskrifter å velge mellom' }),
+        el('p', { text: 'Legg inn oppskrifter under «Oppskrifter» først – så kan du sette dem opp på ukedagene her.' })
+      ]));
+      return section;
+    }
+
+    var planned = plannedDays(week.key);
+    var weekBtn = el('button', {
+      type: 'button', class: 'menu-week-btn',
+      text: planned.length
+        ? 'Legg hele uken i «' + activeList.name + '» (' + planned.length + ' middager)'
+        : 'Ingen middager valgt ennå',
+      disabled: planned.length === 0
+    });
+    weekBtn.addEventListener('click', function () { confirmAddWeekToList(activeList, week); });
+    section.appendChild(weekBtn);
+
+    var today = dateOnly(new Date());
+    var daysEl = el('div', { class: 'menu-days' });
+    for (var day = 0; day < 7; day++) {
+      daysEl.appendChild(buildMenuDayCard(activeList, week, day, today));
+    }
+    section.appendChild(daysEl);
+    return section;
+  }
+
+  function buildMenuDayCard (activeList, week, day, today) {
+    var date = addDays(week.start, day);
+    var entry = getMenuDay(week.key, day);
+    var recipe = entry.recipeId ? findRecipe(entry.recipeId) : null;
+
+    var head = el('div', { class: 'menu-day-head' }, [
+      el('span', { class: 'menu-day-name', text: DAY_NAMES[day] }),
+      el('span', { class: 'menu-day-date', text: date.getDate() + '. ' + MONTH_SHORT[date.getMonth()] })
+    ]);
+
+    var dishKids = [];
+    if (recipe) {
+      var dishEl = el('span', { class: 'menu-dish-name', text: recipe.name });
+      if (recipe.rating) {
+        dishEl.appendChild(el('span', { class: 'die-mark', html: dieSvg(recipe.rating, 15) }));
+      }
+      dishKids.push(dishEl);
+    } else if (entry.recipeId) {
+      /* Oppskriften er slettet, men dagen husker fortsatt hva som var planlagt. */
+      dishKids.push(el('span', { class: 'menu-dish-name is-gone', text: (entry.recipeName || 'Oppskrift') + ' (slettet)' }));
+    } else {
+      dishKids.push(el('span', { class: 'menu-dish-name is-empty', text: 'Velg middag' }));
+    }
+    var dish = el('div', { class: 'menu-day-dish' }, dishKids);
+
+    var kids = [head, dish];
+    if (recipe && recipe.minutes) {
+      kids.push(el('div', { class: 'menu-day-meta' }, [
+        el('span', { class: 'time-icon', html: ICON_CLOCK }),
+        el('span', { text: 'ca. ' + formatDuration(recipe.minutes) })
+      ]));
+    }
+    if (entry.note) kids.push(el('div', { class: 'menu-day-note', text: entry.note }));
+
+    var main = el('button', { type: 'button', class: 'menu-day-main' }, kids);
+    main.addEventListener('click', function () { showMenuDayModal(week, day, date); });
+
+    var card = el('div', { class: 'menu-day' + (sameDay(date, today) ? ' is-today' : '') }, [main]);
+
+    if (recipe) {
+      var addBtn = el('button', {
+        type: 'button', class: 'menu-day-add', html: ICON_CART,
+        'aria-label': 'Legg ' + recipe.name + ' i handlelisten'
+      });
+      addBtn.addEventListener('click', function () {
+        addRecipeToList(activeList, recipe, 1);
+        scheduleSave();
+        flashOnCard(card, 'Lagt i «' + activeList.name + '»');
+      });
+      card.appendChild(addBtn);
+    }
+    return card;
+  }
+
+  /* Liten kvittering på selve dagen. Da slipper du å bli kastet over i
+   * handlelisten hver gang du legger til én dag. */
+  function flashOnCard (card, message) {
+    var old = card.querySelector('.menu-flash');
+    if (old) old.remove();
+    var flash = el('span', { class: 'menu-flash', text: message });
+    card.appendChild(flash);
+    setTimeout(function () { if (flash.parentNode) flash.remove(); }, 2200);
+  }
+
+  function confirmAddWeekToList (activeList, week) {
+    var planned = plannedDays(week.key);
+    if (!planned.length) return;
+    showConfirmModal({
+      title: 'Legg hele uken i handlelisten?',
+      description: 'Ingrediensene fra ' + planned.length + ' middager legges i «' + activeList.name +
+        '». Varer som går igjen i flere retter slås sammen til én rad.',
+      confirmLabel: 'Legg til',
+      cancelLabel: 'Avbryt',
+      onConfirm: function () {
+        planned.forEach(function (p) { addRecipeToList(activeList, p.recipe, 1); });
+        currentView = 'lists';
+        render();
+        scheduleSave();
+      }
+    });
+  }
+
+  /* Dagvinduet: notatet øverst, så oppskriftene. Et trykk på en oppskrift
+   * velger den og lukker vinduet – å planlegge en uke skal gå fort. */
+  function showMenuDayModal (week, day, date) {
+    closeOverlay();
+    var entry = getMenuDay(week.key, day);
+
+    var noteInput = el('input', {
+      type: 'text', class: 'menu-note-input', maxlength: '80', autocomplete: 'off',
+      placeholder: 'F.eks. «rester» eller «ute og spiser»',
+      value: entry.note
+    });
+    /* Notatet lagres mens du skriver. Lukker du vinduet med Escape eller ved å
+     * trykke utenfor, er det allerede tatt vare på. */
+    noteInput.addEventListener('input', function () {
+      if (setMenuNote(week.key, day, noteInput.value)) scheduleSave();
+    });
+
+    var search = el('input', {
+      type: 'search', class: 'menu-pick-search', autocomplete: 'off',
+      placeholder: 'Søk i oppskrifter …'
+    });
+    var listEl = el('div', { class: 'menu-pick-list' });
+
+    function choose (recipe) {
+      setMenuDish(week.key, day, recipe);
+      scheduleSave();
+      closeOverlay();
+      render();
+    }
+
+    function paintPicks () {
+      listEl.innerHTML = '';
+      var q = search.value.trim().toLowerCase();
+      var found = state.recipes.filter(function (r) {
+        if (!q) return true;
+        if (r.name.toLowerCase().indexOf(q) !== -1) return true;
+        return r.ingredients.some(function (i) { return i.name.toLowerCase().indexOf(q) !== -1; });
+      });
+      /* Best terningkast først – det er favorittene du setter opp på en ukedag. */
+      found.sort(function (a, b) {
+        var ra = a.rating || 0, rb = b.rating || 0;
+        if (ra !== rb) return rb - ra;
+        return a.name.localeCompare(b.name, 'nb');
+      });
+      if (!found.length) {
+        listEl.appendChild(el('p', { class: 'menu-pick-empty', text: 'Fant ingen oppskrifter som passer.' }));
+        return;
+      }
+      found.forEach(function (r) {
+        var nameEl = el('span', { class: 'menu-pick-name', text: r.name });
+        if (r.rating) nameEl.appendChild(el('span', { class: 'die-mark', html: dieSvg(r.rating, 15) }));
+        var row = el('button', {
+          type: 'button',
+          class: 'menu-pick-row' + (r.id === entry.recipeId ? ' is-chosen' : '')
+        }, [nameEl, el('span', { class: 'menu-pick-meta', text: mainProtein(r) })]);
+        row.addEventListener('click', function () { choose(r); });
+        listEl.appendChild(row);
+      });
+    }
+    search.addEventListener('input', paintPicks);
+    paintPicks();
+
+    var modalKids = [
+      el('h2', { text: DAY_NAMES[day] }),
+      el('p', { text: date.getDate() + '. ' + MONTH_NAMES[date.getMonth()] }),
+      el('span', { class: 'menu-field-label', text: 'Notat' }),
+      noteInput,
+      el('span', { class: 'menu-field-label', text: 'Middag' }),
+      search,
+      listEl
+    ];
+
+    var actions = [];
+    if (entry.recipeId) {
+      var clearBtn = el('button', { class: 'secondary', type: 'button', text: 'Fjern middagen' });
+      clearBtn.addEventListener('click', function () { choose(null); });
+      actions.push(clearBtn);
+    }
+    var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
+    closeBtn.addEventListener('click', function () { closeOverlay(); render(); });
+    actions.push(closeBtn);
+    modalKids.push(el('div', { class: 'modal-actions' }, actions));
+
+    var modal = el('div', { class: 'modal wide menu-day-modal' }, modalKids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) { closeOverlay(); render(); } });
+    document.body.appendChild(overlay);
   }
 
   function buildRecipesView (activeList) {
@@ -2777,8 +3252,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return { added: added, updated: updated };
   }
 
-  function applyRecipeToActiveList (recipe, factor) {
-    var list = getActiveList();
+  /* Legger ingrediensene i en liste uten å bytte visning. Ukesmenyen bruker
+   * denne direkte, slik at du kan legge til flere dager på rad uten å bli
+   * kastet over i handlelisten mellom hver. */
+  function addRecipeToList (list, recipe, factor) {
     var adder = getName();
     var f = (typeof factor === 'number' && isFinite(factor) && factor > 0) ? factor : 1;
     recipe.ingredients.forEach(function (raw) {
@@ -2786,6 +3263,11 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       var ing = scaleIngredient(raw, f);
       mergeItemIntoList(list, ingredientShoppingName(ing), ing.qty, adder);
     });
+    if (summaryEl) summaryEl.textContent = itemsSummary(list);
+  }
+
+  function applyRecipeToActiveList (recipe, factor) {
+    addRecipeToList(getActiveList(), recipe, factor);
     currentView = 'lists';
     render();
     scheduleSave();
