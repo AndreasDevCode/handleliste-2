@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '021020262315';
+  var APP_VERSION = '031020261157';
 
   /* ============================== styling ============================== */
 
@@ -169,6 +169,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  --accent-soft:#E2EFDD;',
     '  --warn:#C4531F;',
     '  --warn-soft:#F7E4D6;',
+    /* Søylene i Kostnad: én grønn tone i to trinn – hel periode, og «så langt». Kontrollert mot flaten (≥ 3:1) og mot hverandre. */
+    '  --chart-bar:#2A7039;',
+    '  --chart-bar-partial:#5AA068;',
     '  --shadow:0 1px 2px rgba(24,32,20,0.06), 0 10px 28px -16px rgba(24,32,20,0.28);',
     '  --radius-lg:20px;',
     '  --radius-md:14px;',
@@ -190,6 +193,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '    --accent-soft:#213C26;',
     '    --warn:#F0906A;',
     '    --warn-soft:#3B2A21;',
+    '    --chart-bar:#5DBE70;',
+    '    --chart-bar-partial:#3C8B4C;',
     '    --shadow:0 1px 2px rgba(0,0,0,0.35), 0 12px 30px -16px rgba(0,0,0,0.6);',
     '    color-scheme:dark;',
     '  }',
@@ -198,6 +203,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '  --bg:#121A13; --surface:#1B251B; --surface-2:#223221; --ink:#EDF3E7; --ink-soft:#C3D0BC;',
     '  --muted:#8FA085; --line:#2B3A29; --accent:#6BC97E; --accent-strong:#8CDB9B; --accent-ink:#0E1A0F;',
     '  --accent-soft:#213C26; --warn:#F0906A; --warn-soft:#3B2A21;',
+    '  --chart-bar:#5DBE70; --chart-bar-partial:#3C8B4C;',
     '  --shadow:0 1px 2px rgba(0,0,0,0.35), 0 12px 30px -16px rgba(0,0,0,0.6);',
     '  color-scheme:dark;',
     '}',
@@ -484,6 +490,114 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     '.plan-day-meta.is-free{color:var(--muted);}',
     '.plan-day-row.is-chosen .plan-day-meta{color:var(--accent-strong);}',
 
+    /* --- handletur-knapp i listene --- */
+    '.trip-row{display:flex;justify-content:center;margin-top:14px;}',
+    '.link-btn.trip-link{font-size:13.5px;font-weight:600;text-decoration:none;padding:8px 12px;}',
+
+    /* --- kostnad --- */
+    '.cost-register{',
+    '  width:100%;border:none;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;',
+    '  font-size:14px;padding:12px;border-radius:var(--radius-sm);cursor:pointer;margin-bottom:14px;',
+    '}',
+    '.cost-register:active{background:var(--accent-strong);}',
+    '.cost-notice{',
+    '  font-size:12.5px;line-height:1.45;color:var(--ink-soft);background:var(--warn-soft);',
+    '  border-radius:var(--radius-sm);padding:10px 12px;margin:0 0 14px;',
+    '}',
+    '.cost-tiles{',
+    '  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));',
+    '  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);',
+    '  box-shadow:var(--shadow);margin-bottom:8px;',
+    '}',
+    '.cost-tile{padding:12px 10px;min-width:0;}',
+    '.cost-tile + .cost-tile{border-left:1px solid var(--line);}',
+    '.cost-tile-label{display:block;font-size:11.5px;color:var(--muted);line-height:1.3;margin-bottom:4px;}',
+    '.cost-tile-value{display:block;font-size:18px;font-weight:600;color:var(--ink);white-space:nowrap;}',
+    '.cost-tile-sub{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.3;}',
+    '.cost-year{font-size:12.5px;color:var(--ink-soft);text-align:center;margin:0 0 16px;line-height:1.45;}',
+    '.cost-card{',
+    '  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);',
+    '  box-shadow:var(--shadow);padding:12px 12px 14px;margin-bottom:16px;',
+    '}',
+    '.cost-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}',
+    '.cost-card-title{font-size:14px;font-weight:600;}',
+    '.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;background:var(--bg);}',
+    '.seg button{',
+    '  border:0;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);',
+    '  padding:5px 11px;border-radius:999px;cursor:pointer;',
+    '}',
+    '.seg button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);}',
+    '.chart-wrap{position:relative;}',
+    '.chart-svg{display:block;width:100%;height:auto;overflow:visible;}',
+    '.chart-grid{stroke:var(--line);stroke-width:1;shape-rendering:crispEdges;}',
+    '.chart-tick{fill:var(--muted);font-size:10px;font-variant-numeric:tabular-nums;}',
+    '.chart-x{fill:var(--muted);font-size:10px;}',
+    '.chart-x.is-selected{fill:var(--ink);font-weight:600;}',
+    '.chart-band{fill:var(--surface-2);}',
+    '.chart-bar{fill:var(--chart-bar);}',
+    '.chart-bar.is-partial{fill:var(--chart-bar-partial);}',
+    '.chart-value{fill:var(--ink);font-size:10.5px;font-weight:600;}',
+    '.chart-hit{fill:transparent;cursor:pointer;outline:none;}',
+    '.chart-hit:focus-visible{stroke:var(--accent);stroke-width:2;}',
+    '.chart-key{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin:6px 0 0;}',
+    '.chart-key-swatch{width:10px;height:10px;border-radius:2px;background:var(--chart-bar-partial);flex:none;}',
+    '.chart-tip{',
+    '  position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);',
+    '  border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.3;white-space:nowrap;',
+    '  transform:translate(-50%,-100%);margin-top:-6px;box-shadow:var(--shadow);z-index:3;',
+    '}',
+    '.chart-tip strong{display:block;font-size:13px;}',
+    '.cost-detail{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;}',
+    '.cost-detail-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);}',
+    '.cost-detail-range{font-size:12px;color:var(--muted);margin-left:6px;}',
+    '.cost-detail-value{font-size:24px;font-weight:600;margin:2px 0 2px;}',
+    '.cost-detail-line{font-size:12.5px;color:var(--ink-soft);margin:2px 0;line-height:1.45;}',
+    '.cost-detail .plan-btn{margin-top:10px;}',
+    '.cost-table{margin-top:10px;font-size:12.5px;}',
+    '.cost-table summary{cursor:pointer;color:var(--accent);font-weight:600;}',
+    '.cost-table table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums;}',
+    '.cost-table th,.cost-table td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;}',
+    '.cost-table th:first-child,.cost-table td:first-child{text-align:left;}',
+    '.cost-table th{font-weight:600;color:var(--muted);font-size:11.5px;}',
+    '.trip-section-head{display:flex;align-items:baseline;justify-content:space-between;margin:4px 2px 8px;}',
+    '.trip-section-head h3{font-size:16px;}',
+    '.trip-section-head span{font-size:12px;color:var(--muted);}',
+    '.trip-month{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;font-weight:700;color:var(--muted);margin:14px 2px 6px;font-variant-numeric:tabular-nums;}',
+    '.trip-month span:first-child{letter-spacing:.06em;text-transform:uppercase;}',
+    '.trip-month:first-of-type{margin-top:0;}',
+    '.trip-list{display:flex;flex-direction:column;gap:6px;}',
+    '.trip-item{',
+    '  display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;',
+    '  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);',
+    '  font:inherit;color:inherit;padding:10px 12px;cursor:pointer;',
+    '}',
+    '.trip-item:active{background:var(--surface-2);}',
+    '.trip-date{font-size:14px;}',
+    '.trip-who{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;}',
+    '.trip-amount{font-size:14.5px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;}',
+    '.trip-more{width:100%;margin-top:8px;border:1px dashed var(--line);background:transparent;color:var(--accent);font:inherit;font-weight:600;font-size:13px;padding:10px;border-radius:var(--radius-sm);cursor:pointer;}',
+    '.setting-row{display:flex;gap:10px;align-items:flex-start;margin:22px 2px 0;font-size:13px;color:var(--ink-soft);line-height:1.45;cursor:pointer;}',
+    '.setting-row input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--accent);flex:none;}',
+    '.setting-row small{display:block;font-size:11.5px;color:var(--muted);}',
+    '.trip-modal form{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}',
+    '.trip-field-row{display:flex;gap:8px;}',
+    '.trip-field-row > label{flex:1;min-width:0;}',
+    '.trip-modal .trip-amount-input{font-size:20px;font-weight:600;}',
+    '.trip-modal input{width:100%;}',
+    '.trip-modal .menu-field-label{margin-top:0;}',
+    '.trip-extra{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-2px 0 12px;}',
+    '.trip-extra .link-btn{font-size:12.5px;}',
+    '.trip-extra .link-btn.danger{color:var(--warn);}',
+    '.week-menu-spent{font-size:13px;color:var(--ink-soft);text-align:center;margin:-4px 0 12px;}',
+    '.week-menu-row{display:flex;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);}',
+    '.week-menu-row:last-child{border-bottom:0;}',
+    '.week-menu-day{flex:none;width:86px;font-size:12px;color:var(--muted);line-height:1.35;}',
+    '.week-menu-day strong{display:block;color:var(--accent);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;}',
+    '.week-menu-dish{font-size:14px;min-width:0;word-break:break-word;}',
+    '.week-menu-dish.is-empty{color:var(--muted);}',
+    '.week-menu-note{display:block;font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:2px;}',
+    '.week-menu-list{margin-bottom:14px;}',
+
     '.recipe-list{display:flex;flex-direction:column;gap:10px;}',
     '.recipe-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow);}',
     '.recipe-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;}',
@@ -741,7 +855,14 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * nytt hver gang noen krysser av en vare – ligger bildene der, blir hvert
    * trykk flere megabyte over mobilnettet. */
   var IMAGE_COLLECTION = 'handleliste-bilder';
+  /* Gamle ukesmenyer arkiveres i ett dokument per år. Av samme grunn som
+   * bildene: hovedlisten sendes ved hvert trykk, og to år med menyer der ville
+   * gjort hvert eneste avkryss tregere. Arkivet hentes bare når noen ber om det. */
+  var ARCHIVE_COLLECTION = 'handleliste-arkiv';
   var DOC_ID = 'shared-state';
+  /* Om appen skal spørre hva handleturen kostet når du tømmer avkryssede varer.
+   * Lagres per telefon: den ene kan slå det av uten å ta det fra den andre. */
+  var ASK_TRIP_KEY = 'handleliste_ask_trip_v1';
 
   function getName () {
     try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; }
@@ -779,6 +900,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
   function setStoredRecipeSort (v) {
     try { localStorage.setItem(RECIPE_SORT_KEY, v); } catch (e) {}
+  }
+
+  function getAskTrip () {
+    try { return localStorage.getItem(ASK_TRIP_KEY) !== 'off'; } catch (e) { return true; }
+  }
+  function setAskTrip (on) {
+    try { localStorage.setItem(ASK_TRIP_KEY, on ? 'on' : 'off'); } catch (e) {}
   }
 
   function clearCachedState () {
@@ -922,11 +1050,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   }
 
-  /* Gamle uker rydder seg selv bort. Vi venter to uker i stedet for å kaste
-   * uken med en gang den er over: da spiller det ingen rolle om de to
-   * telefonene er litt uenige om hva klokken er. */
+  /* Uker som er over, flyttes ut av hoveddokumentet og inn i arkivet. Vi venter
+   * to uker i stedet for å flytte uken med en gang den er over: da spiller det
+   * ingen rolle om de to telefonene er litt uenige om hva klokken er. */
   var MENU_KEEP_WEEKS = 2;
   function oldestKeptWeekKey () { return weekKeyOf(addDays(new Date(), -7 * MENU_KEEP_WEEKS)); }
+
+  /* Hvor lenge historikken tas vare på: to år, pluss de samme to ukenes slakk.
+   * Gjelder både arkivet og – som en ytre grense – hoveddokumentet, i tilfelle
+   * arkiveringen ikke får gjort jobben sin (for eksempel uten nye regler). */
+  var MENU_HISTORY_WEEKS = 106;
+  function oldestHistoryWeekKey () { return weekKeyOf(addDays(new Date(), -7 * MENU_HISTORY_WEEKS)); }
 
   /* En dag i menyen. Id-en er regnet ut av uke + ukedag, ikke tilfeldig, slik at
    * begge telefonene lager NØYAKTIG samme id for «onsdag i uke 41». Uten det
@@ -979,11 +1113,129 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * gravsteinen: kastet vi den, ville den andre telefonens kopi av middagen
    * komme tilbake ved neste sammenslåing. */
   function canonicalMenu (menu) {
-    var cutoff = oldestKeptWeekKey();
+    /* Gamle uker kastes ikke lenger her – de flyttes til arkivet av
+     * archiveOldWeeks(), som trenger nett. Bare det som er eldre enn hele
+     * historikken faller bort, så hoveddokumentet aldri kan vokse uten grense. */
+    var cutoff = oldestHistoryWeekKey();
     return (menu || [])
       .filter(function (d) { return d.week >= cutoff; })
       .filter(function (d) { return d.recipeId || d.note || d.updatedAt || d.noteAt; })
       .sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+  }
+
+  /* ============================== handleturer: penger og datoer ==============================
+   * Beløp lagres i øre som heltall. Med desimaltall ville et år med summer
+   * drevet noen øre feil; med heltall er hver sum eksakt. */
+
+  var NBSP = ' ';
+  var MAX_TRIP_ORE = 10000000;   // 100 000 kr – alt over er nesten sikkert en tastefeil
+
+  /* Godtar «1247,80», «1247.80», «1 247,80», «1.247,80», «1248» og «1248 kr».
+   * Returnerer øre, eller null hvis teksten ikke er et fornuftig beløp. */
+  function parseAmount (text) {
+    var t = String(text == null ? '' : text).replace(/[\s  ]/g, '').replace(/kr\.?$/i, '').replace(/,-$/, '');
+    if (!t) return null;
+    if (t.indexOf(',') !== -1) {
+      /* Komma er desimaltegnet; punktum foran er tusenskille. */
+      t = t.replace(/\./g, '').replace(',', '.');
+    } else if ((t.match(/\./g) || []).length > 1) {
+      t = t.replace(/\./g, '');
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+    var parts = t.split('.');
+    var ore = parseInt(parts[0], 10) * 100 + (parts[1] ? parseInt((parts[1] + '0').slice(0, 2), 10) : 0);
+    if (!(ore > 0) || ore > MAX_TRIP_ORE) return null;
+    return ore;
+  }
+  function groupThousands (n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  }
+  /* Nøyaktig beløp: «1 247,80 kr», men «2 015 kr» uten et tomt «,00». */
+  function formatKr (ore) {
+    var neg = ore < 0;
+    ore = Math.abs(Math.round(ore));
+    var kr = Math.floor(ore / 100), rest = ore % 100;
+    return (neg ? '−' : '') + groupThousands(kr) + (rest ? ',' + pad2(rest) : '') + NBSP + 'kr';
+  }
+  /* Avrundet til hele kroner – for summer og diagram, der ørene bare er støy. */
+  function formatKrRounded (ore) {
+    var kr = Math.round(ore / 100);
+    return (kr < 0 ? '−' : '') + groupThousands(Math.abs(kr)) + NBSP + 'kr';
+  }
+  /* Til feltet når du retter en tur: ingen tusenskille, komma for øre. */
+  function amountInputValue (ore) {
+    var kr = Math.floor(ore / 100), rest = ore % 100;
+    return String(kr) + (rest ? ',' + pad2(rest) : '');
+  }
+  function formatPct (fraction) {
+    var p = Math.round(fraction * 1000) / 10;
+    var sign = p > 0 ? '+' : (p < 0 ? '−' : '±');
+    return sign + String(Math.abs(p)).replace('.', ',') + NBSP + '%';
+  }
+
+  /* Datoer lagres som «2026-10-03» i telefonens lokale tid. Som tekst
+   * sorterer de riktig, og de er de samme uansett tidssone på lagringstidspunktet. */
+  function ymdOf (d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function parseYmd (s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!m) return null;
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return (d.getMonth() === +m[2] - 1) ? d : null;
+  }
+  function daysInMonth (year, month) { return new Date(year, month + 1, 0).getDate(); }
+
+  /* Handleturer tas vare på i 25 måneder: to år, og en måned ekstra slik at
+   * «samme måned i fjor» fortsatt har en hel måned å sammenligne med. */
+  var TRIP_KEEP_MONTHS = 25;
+  function oldestTripYmd () {
+    var t = dateOnly(new Date());
+    return ymdOf(new Date(t.getFullYear(), t.getMonth() - TRIP_KEEP_MONTHS, t.getDate()));
+  }
+
+  function normalizeTrip (raw) {
+    var date = parseYmd(raw && raw.date);
+    var amount = Math.round(num(raw && raw.amount, 0));
+    if (!date || !(amount > 0) || amount > MAX_TRIP_ORE) return null;
+    var created = num(raw && raw.createdAt, 0);
+    return {
+      id: (raw && raw.id) || uid(),
+      date: ymdOf(date),
+      amount: amount,
+      addedBy: normalizeName(raw && raw.addedBy).slice(0, 30) || null,
+      createdAt: created,
+      updatedAt: num(raw && raw.updatedAt, created)
+    };
+  }
+  function normalizeTrips (raw) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function (t) {
+      var trip = normalizeTrip(t);
+      if (trip) out.push(trip);
+    });
+    return out;
+  }
+  /* Rettes beløp eller dato på begge telefonene samtidig, vinner den siste. */
+  function mergeTrips (a, b) {
+    var base = pickNewer(a, b, 'updatedAt');
+    return {
+      id: a.id,
+      date: base.date,
+      amount: base.amount,
+      addedBy: a.addedBy || b.addedBy || null,
+      createdAt: Math.min(a.createdAt, b.createdAt),
+      updatedAt: Math.max(a.updatedAt, b.updatedAt)
+    };
+  }
+  function canonicalTrips (trips, tomb) {
+    var cutoff = oldestTripYmd();
+    return (trips || [])
+      .filter(function (t) { return !((tomb && tomb.trips) || {})[t.id] && t.date >= cutoff; })
+      .sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+      });
   }
 
   /* ---------- lagrede ukesmenyer ----------
@@ -1036,11 +1288,11 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     };
   }
 
-  function emptyTombstones () { return { lists: {}, items: {}, recipes: {}, savedMenus: {} }; }
+  function emptyTombstones () { return { lists: {}, items: {}, recipes: {}, savedMenus: {}, trips: {} }; }
 
   function normalizeTombstones (raw) {
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
+    ['lists', 'items', 'recipes', 'savedMenus', 'trips'].forEach(function (kind) {
       var src = raw && raw[kind];
       if (!src || typeof src !== 'object') return;
       Object.keys(src).forEach(function (id) {
@@ -1052,7 +1304,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
   function mergeTombstones (a, b) {
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
+    ['lists', 'items', 'recipes', 'savedMenus', 'trips'].forEach(function (kind) {
       [a && a[kind], b && b[kind]].forEach(function (src) {
         if (!src) return;
         Object.keys(src).forEach(function (id) {
@@ -1065,15 +1317,18 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function pruneTombstones (tomb) {
     var cutoff = Date.now() - TOMBSTONE_TTL;
     var out = emptyTombstones();
-    ['lists', 'items', 'recipes', 'savedMenus'].forEach(function (kind) {
-      Object.keys(tomb[kind]).forEach(function (id) {
-        if (tomb[kind][id] >= cutoff) out[kind][id] = tomb[kind][id];
+    ['lists', 'items', 'recipes', 'savedMenus', 'trips'].forEach(function (kind) {
+      /* En eldre tilstand kan mangle en av typene – da er det bare ingenting å rydde. */
+      var src = (tomb && tomb[kind]) || {};
+      Object.keys(src).forEach(function (id) {
+        if (src[id] >= cutoff) out[kind][id] = src[id];
       });
     });
     return out;
   }
   function tombstone (kind, id) {
     if (!state.tombstones) state.tombstones = emptyTombstones();
+    if (!state.tombstones[kind]) state.tombstones[kind] = {};
     state.tombstones[kind][id] = Date.now();
   }
 
@@ -1132,7 +1387,10 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var savedMenus = (s.savedMenus || [])
       .filter(function (m) { return !tomb.savedMenus[m.id]; })
       .sort(byField('createdAt'));
-    return { lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), savedMenus: savedMenus, tombstones: tomb };
+    return {
+      lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), savedMenus: savedMenus,
+      trips: canonicalTrips(s.trips, tomb), tombstones: tomb
+    };
   }
 
   /* Den aller første listen får en FAST id. Ellers ville de to telefonene laget
@@ -1143,6 +1401,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   function ensureAtLeastOneList (s) {
     if (!Array.isArray(s.menu)) s.menu = [];
     if (!Array.isArray(s.savedMenus)) s.savedMenus = [];
+    if (!Array.isArray(s.trips)) s.trips = [];
     if (!s.lists.length) {
       s.lists.push({ id: DEFAULT_LIST_ID, name: 'Handleliste', createdAt: 0, updatedAt: 0, items: [] });
     }
@@ -1224,6 +1483,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       recipes: mergeById(mine.recipes, theirs.recipes, mergeRecipes),
       menu: mergeById(mine.menu || [], theirs.menu || [], mergeMenuDays),
       savedMenus: mergeById(mine.savedMenus || [], theirs.savedMenus || [], mergeSavedMenus),
+      trips: mergeById(mine.trips || [], theirs.trips || [], mergeTrips),
       tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
     }));
   }
@@ -1467,11 +1727,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       recipes: recipes,
       menu: normalizeMenu(raw && raw.menu),
       savedMenus: normalizeSavedMenus(raw && raw.savedMenus),
+      trips: normalizeTrips(raw && raw.trips),
       tombstones: normalizeTombstones(raw && raw.tombstones)
     });
   }
 
-  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], savedMenus: [], tombstones: emptyTombstones() });
+  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], savedMenus: [], trips: [], tombstones: emptyTombstones() });
   var activeListId = getStoredActiveListId();
 
   function ensureActiveList () {
@@ -1781,6 +2042,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       root.appendChild(buildRecipesView(list));
     } else if (currentView === 'menu') {
       root.appendChild(buildMenuView(list));
+    } else if (currentView === 'costs') {
+      root.appendChild(buildCostsView());
     } else {
       root.appendChild(buildTabsRow(list));
       root.appendChild(buildAddForm(list));
@@ -1795,6 +2058,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         ]);
         root.appendChild(footerRowEl);
       }
+
+      /* Alltid her, også når ingenting er krysset av – for den som handlet
+       * uten å bruke listen, eller som har slått av spørsmålet. */
+      var tripBtn = el('button', { type: 'button', class: 'link-btn trip-link', text: 'Registrer handletur' });
+      tripBtn.addEventListener('click', function () { showTripModal(null); });
+      root.appendChild(el('div', { class: 'trip-row' }, [tripBtn]));
     }
 
     var hint = el('p', { class: 'hint' });
@@ -1850,13 +2119,20 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
   }
 
   function buildViewSwitch () {
-    var listsBtn = el('button', { type: 'button', class: currentView === 'lists' ? 'active' : '', text: 'Handlelister' });
-    var menuBtn = el('button', { type: 'button', class: currentView === 'menu' ? 'active' : '', text: 'Ukesmeny' });
-    var recipesBtn = el('button', { type: 'button', class: currentView === 'recipes' ? 'active' : '', text: 'Oppskrifter' });
-    listsBtn.addEventListener('click', function () { setView('lists'); });
-    menuBtn.addEventListener('click', function () { setView('menu'); });
-    recipesBtn.addEventListener('click', function () { setView('recipes'); });
-    return el('div', { class: 'view-switch' }, [listsBtn, menuBtn, recipesBtn]);
+    /* Fire faner på én rad. Korte navn er det som får dem til å passe på en
+     * telefon – «Oppskrifter» alene tok nesten en fjerdedel av bredden. */
+    var row = el('div', { class: 'view-switch' });
+    [
+      { key: 'lists', label: 'Lister' },
+      { key: 'menu', label: 'Uka' },
+      { key: 'recipes', label: 'Retter' },
+      { key: 'costs', label: 'Kostnad' }
+    ].forEach(function (tab) {
+      var btn = el('button', { type: 'button', class: currentView === tab.key ? 'active' : '', text: tab.label });
+      btn.addEventListener('click', function () { setView(tab.key); });
+      row.appendChild(btn);
+    });
+    return row;
   }
 
   function itemsSummary (list) {
@@ -2072,7 +2348,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (state.recipes.length === 0) {
       section.appendChild(el('div', { class: 'empty-state' }, [
         el('h3', { text: 'Ingen oppskrifter å velge mellom' }),
-        el('p', { text: 'Legg inn oppskrifter under «Oppskrifter» først – så kan du sette dem opp på ukedagene her.' })
+        el('p', { text: 'Legg inn oppskrifter under «Retter» først – så kan du sette dem opp på ukedagene her.' })
       ]));
       return section;
     }
@@ -2404,6 +2680,642 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) { closeOverlay(); render(); } });
     document.body.appendChild(overlay);
+  }
+
+  /* ============================== kostnad: utregning ============================== */
+
+  var MONTH_AXIS = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+  var costMode = 'weeks';          // 'weeks' | 'months'
+  var costSelected = null;         // indeks i diagrammet; null = inneværende periode
+  var costShowAllTrips = false;
+
+  function capitalize (t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+  function daysBetween (a, b) { return Math.round((dateOnly(b) - dateOnly(a)) / 86400000); }
+  function todayDate () { return dateOnly(new Date()); }
+
+  /* Sum og antall turer mellom to datoer, begge dager tatt med. */
+  function sumTrips (from, to) {
+    var f = ymdOf(from), t = ymdOf(to);
+    var sum = 0, count = 0;
+    state.trips.forEach(function (trip) {
+      if (trip.date >= f && trip.date <= t) { sum += trip.amount; count++; }
+    });
+    return { sum: sum, count: count };
+  }
+
+  function weekPeriods (count) {
+    var mon = mondayOf(new Date());
+    var out = [];
+    for (var i = count - 1; i >= 0; i--) {
+      var start = addDays(mon, -7 * i);
+      var wk = isoWeek(start).week;
+      out.push({
+        kind: 'week', start: start, end: addDays(start, 6), current: i === 0,
+        short: String(wk), title: 'Uke ' + wk, range: weekRangeLabel(start)
+      });
+    }
+    return out;
+  }
+  function monthPeriods (count) {
+    var t = todayDate();
+    var out = [];
+    for (var i = count - 1; i >= 0; i--) {
+      var start = new Date(t.getFullYear(), t.getMonth() - i, 1);
+      var m = start.getMonth(), y = start.getFullYear();
+      out.push({
+        kind: 'month', start: start, end: new Date(y, m + 1, 0), current: i === 0,
+        short: MONTH_AXIS[m], title: capitalize(MONTH_NAMES[m]) + ' ' + y, range: ''
+      });
+    }
+    return out;
+  }
+
+  /* Den pågående perioden teller bare til og med i dag. */
+  function periodEnd (p) {
+    var t = todayDate();
+    return p.end > t ? t : p.end;
+  }
+  function periodTotals (p) { return sumTrips(p.start, periodEnd(p)); }
+
+  /* Sammenligning med forrige periode. For en pågående periode sammenligner vi
+   * like mange dager inn – ellers ser den 3. oktober ut som et stup mot hele
+   * september, bare fordi oktober ikke er ferdig. */
+  function previousComparable (p) {
+    var t = todayDate();
+    if (p.kind === 'week') {
+      var ps = addDays(p.start, -7);
+      var pe = p.current ? addDays(ps, daysBetween(p.start, t)) : addDays(p.end, -7);
+      var wk = isoWeek(ps).week;
+      var span = daysBetween(ps, pe);
+      return {
+        from: ps, to: pe,
+        label: span >= 6 ? 'uke ' + wk
+          : 'samme dager i uke ' + wk + ' (' + DAY_SHORT[0] + (span ? '–' + DAY_SHORT[span] : '') + ')'
+      };
+    }
+    var y = p.start.getFullYear(), m = p.start.getMonth();
+    var start = new Date(y, m - 1, 1);
+    var dim = daysInMonth(start.getFullYear(), start.getMonth());
+    var lastDay = p.current ? Math.min(t.getDate(), dim) : dim;
+    var end = new Date(start.getFullYear(), start.getMonth(), lastDay);
+    return {
+      from: start, to: end,
+      label: lastDay === dim ? MONTH_NAMES[start.getMonth()]
+        : (lastDay === 1 ? '1. ' : '1.–' + lastDay + '. ') + MONTH_NAMES[start.getMonth()]
+    };
+  }
+  function lastYearComparable (p) {
+    var t = todayDate();
+    var y = p.start.getFullYear() - 1, m = p.start.getMonth();
+    var dim = daysInMonth(y, m);
+    var lastDay = p.current ? Math.min(t.getDate(), dim) : dim;
+    return {
+      from: new Date(y, m, 1), to: new Date(y, m, lastDay),
+      label: (lastDay === dim ? '' : (lastDay === 1 ? '1. ' : '1.–' + lastDay + '. ')) + MONTH_NAMES[m] + ' ' + y
+    };
+  }
+  /* Er det i det hele tatt registrert noe så langt tilbake? Uten det er «0 kr i
+   * fjor» et tall som later som det vet noe. */
+  function hasTripsSince (d) {
+    var first = state.trips.length ? state.trips[0].date : null;
+    return !!first && first <= ymdOf(d);
+  }
+  function compareLine (curSum, cmp) {
+    if (!hasTripsSince(cmp.to)) return null;
+    var prev = sumTrips(cmp.from, cmp.to).sum;
+    if (!prev) return 'Ingen turer ' + cmp.label + ' å sammenligne med.';
+    return formatPct((curSum - prev) / prev) + ' mot ' + cmp.label + ' (' + formatKrRounded(prev) + ')';
+  }
+
+  /* Pene tall på y-aksen: 0, 1 000, 2 000 … */
+  function niceStep (maxKr) {
+    if (maxKr <= 0) return 500;
+    var raw = maxKr / 3;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var steps = [1, 2, 2.5, 5, 10];
+    for (var i = 0; i < steps.length; i++) if (steps[i] * mag >= raw) return steps[i] * mag;
+    return 10 * mag;
+  }
+
+  /* ============================== kostnad: visning ============================== */
+
+  function buildCostsView () {
+    var section = el('section', { class: 'list-section' });
+
+    var regBtn = el('button', { type: 'button', class: 'cost-register', text: '+ Registrer handletur' });
+    regBtn.addEventListener('click', function () { showTripModal(null); });
+    section.appendChild(regBtn);
+
+    if (archiveProblem === 'rules') {
+      section.appendChild(el('p', {
+        class: 'cost-notice',
+        text: 'Gamle ukesmenyer kan ikke arkiveres før de nye reglene er limt inn i Firebase. Ingenting er tapt – ukene blir liggende til reglene er på plass.'
+      }));
+    }
+
+    if (!state.trips.length) {
+      section.appendChild(el('div', { class: 'empty-state' }, [
+        el('h3', { text: 'Ingen handleturer ennå' }),
+        el('p', { text: 'Registrer hva handleturen kostet, så bygger oversikten seg opp uke for uke.' })
+      ]));
+      section.appendChild(buildAskTripSetting());
+      return section;
+    }
+
+    section.appendChild(buildCostTiles());
+    section.appendChild(buildYearLine());
+    section.appendChild(buildCostChartCard());
+    section.appendChild(buildTripList());
+    section.appendChild(buildAskTripSetting());
+    return section;
+  }
+
+  function costTile (label, value, sub) {
+    return el('div', { class: 'cost-tile' }, [
+      el('span', { class: 'cost-tile-label', text: label }),
+      el('span', { class: 'cost-tile-value', text: value }),
+      sub ? el('span', { class: 'cost-tile-sub', text: sub }) : null
+    ]);
+  }
+
+  function buildCostTiles () {
+    var cur = monthPeriods(1)[0];
+    var curT = periodTotals(cur);
+    var prevStart = new Date(cur.start.getFullYear(), cur.start.getMonth() - 1, 1);
+    var prevFull = sumTrips(prevStart, new Date(cur.start.getFullYear(), cur.start.getMonth(), 0));
+    var cmp = previousComparable(cur);
+
+    var changeValue = '–', changeSub;
+    if (!hasTripsSince(cmp.to)) {
+      changeSub = 'ingen tall fra ' + MONTH_NAMES[prevStart.getMonth()] + ' ennå';
+    } else {
+      var prevLike = sumTrips(cmp.from, cmp.to).sum;
+      if (prevLike) {
+        changeValue = formatPct((curT.sum - prevLike) / prevLike);
+        changeSub = 'mot ' + cmp.label;
+      } else {
+        changeSub = 'ingen turer ' + cmp.label;
+      }
+    }
+
+    return el('div', { class: 'cost-tiles' }, [
+      costTile(capitalize(MONTH_NAMES[cur.start.getMonth()]) + ' så langt', formatKrRounded(curT.sum),
+        curT.count + (curT.count === 1 ? ' tur' : ' turer')),
+      costTile(capitalize(MONTH_NAMES[prevStart.getMonth()]), formatKrRounded(prevFull.sum),
+        prevFull.count + (prevFull.count === 1 ? ' tur' : ' turer')),
+      costTile('Endring', changeValue, changeSub)
+    ]);
+  }
+
+  /* Siste 365 dager mot de 365 før – like lange perioder, så tallene kan
+   * sammenlignes direkte. */
+  function buildYearLine () {
+    var t = todayDate();
+    var thisYear = sumTrips(addDays(t, -364), t);
+    var yearBefore = { from: addDays(t, -729), to: addDays(t, -365) };
+    var txt = 'Siste 12 måneder: ' + formatKrRounded(thisYear.sum);
+    if (hasTripsSince(yearBefore.to)) {
+      var prev = sumTrips(yearBefore.from, yearBefore.to).sum;
+      txt += ' · året før: ' + formatKrRounded(prev);
+      if (prev) txt += ' (' + formatPct((thisYear.sum - prev) / prev) + ')';
+    } else {
+      txt += ' · ingen tall fra året før ennå';
+    }
+    return el('p', { class: 'cost-year', text: txt });
+  }
+
+  function buildCostChartCard () {
+    var periods = costMode === 'weeks' ? weekPeriods(12) : monthPeriods(12);
+    var totals = periods.map(periodTotals);
+    var sel = (costSelected === null || costSelected >= periods.length) ? periods.length - 1 : costSelected;
+
+    var seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Vis per' });
+    [{ key: 'weeks', label: 'Uker' }, { key: 'months', label: 'Måneder' }].forEach(function (o) {
+      var b = el('button', { type: 'button', class: costMode === o.key ? 'active' : '', text: o.label, 'aria-pressed': String(costMode === o.key) });
+      b.addEventListener('click', function () {
+        if (costMode === o.key) return;
+        costMode = o.key;
+        costSelected = null;
+        render();
+      });
+      seg.appendChild(b);
+    });
+
+    var card = el('div', { class: 'cost-card' });
+    card.appendChild(el('div', { class: 'cost-card-head' }, [
+      el('span', { class: 'cost-card-title', text: costMode === 'weeks' ? 'Siste 12 uker' : 'Siste 12 måneder' }),
+      seg
+    ]));
+
+    var detail = el('div', { class: 'cost-detail' });
+    var chart = buildBarChart(periods, totals, function (i) {
+      costSelected = i;
+      paintDetail(i);
+    });
+    function paintDetail (i) {
+      chart.select(i);
+      detail.innerHTML = '';
+      fillCostDetail(detail, periods[i], totals[i]);
+    }
+    card.appendChild(chart.node);
+    card.appendChild(el('p', { class: 'chart-key' }, [
+      el('span', { class: 'chart-key-swatch' }),
+      el('span', { text: 'Lysere søyle: ' + (costMode === 'weeks' ? 'uka' : 'måneden') + ' er ikke ferdig ennå' })
+    ]));
+    card.appendChild(detail);
+    paintDetail(sel);
+    card.appendChild(buildCostTable(periods, totals));
+    return card;
+  }
+
+  function fillCostDetail (detail, p, tot) {
+    detail.appendChild(el('div', {}, [
+      el('span', { class: 'cost-detail-eyebrow', text: p.title + (p.current ? ' · så langt' : '') }),
+      p.range ? el('span', { class: 'cost-detail-range', text: p.range }) : null
+    ]));
+    detail.appendChild(el('div', { class: 'cost-detail-value', text: formatKr(tot.sum) }));
+    var meta = tot.count + (tot.count === 1 ? ' tur' : ' turer');
+    if (tot.count > 1) meta += ' · snitt ' + formatKrRounded(tot.sum / tot.count) + ' per tur';
+    detail.appendChild(el('p', { class: 'cost-detail-line', text: meta }));
+
+    var prevLine = compareLine(tot.sum, previousComparable(p));
+    if (prevLine) detail.appendChild(el('p', { class: 'cost-detail-line cmp-prev', text: prevLine }));
+    if (p.kind === 'month') {
+      var yearLine = compareLine(tot.sum, lastYearComparable(p));
+      if (yearLine) detail.appendChild(el('p', { class: 'cost-detail-line cmp-year', text: yearLine }));
+    }
+
+    if (p.kind === 'week') {
+      var menuBtn = el('button', { type: 'button', class: 'plan-btn week-menu-btn' }, [
+        el('span', { class: 'plan-btn-icon', html: ICON_CALENDAR }),
+        el('span', { text: 'Se ukesmenyen for ' + p.title.toLowerCase() })
+      ]);
+      menuBtn.addEventListener('click', function () { showWeekMenuModal(p.start); });
+      detail.appendChild(menuBtn);
+    }
+  }
+
+  /* Tabellen er diagrammets tvilling: de samme tallene, lesbare uten å treffe
+   * en søyle – og for skjermleser. */
+  function buildCostTable (periods, totals) {
+    var tbody = el('tbody');
+    for (var i = periods.length - 1; i >= 0; i--) {
+      tbody.appendChild(el('tr', {}, [
+        el('td', { text: periods[i].title + (periods[i].current ? ' (så langt)' : '') }),
+        el('td', { text: String(totals[i].count) }),
+        el('td', { text: formatKrRounded(totals[i].sum) })
+      ]));
+    }
+    return el('details', { class: 'cost-table' }, [
+      el('summary', { text: 'Vis som tabell' }),
+      el('table', {}, [
+        el('thead', {}, [el('tr', {}, [
+          el('th', { text: costMode === 'weeks' ? 'Uke' : 'Måned' }),
+          el('th', { text: 'Turer' }),
+          el('th', { text: 'Beløp' })
+        ])]),
+        tbody
+      ])
+    ]);
+  }
+
+  /* Søylediagram tegnet som SVG i appen selv: virker uten nett og følger
+   * mørk modus. Én grønn tone; den pågående perioden et lysere trinn av samme
+   * tone. Tynne søyler med avrundet topp og flat bunn, hårfine rutelinjer. */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl (tag, attrs) {
+    var n = document.createElementNS(SVG_NS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function barPath (x, y, w, h) {
+    if (h <= 0) return '';
+    var r = Math.min(4, h, w / 2);
+    return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y +
+           'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z';
+  }
+
+  function buildBarChart (periods, totals, onSelect) {
+    var W = 360, H = 190, padL = 42, padR = 8, padT = 28, padB = 24;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var n = periods.length, slot = plotW / n;
+    var barW = Math.min(24, slot - 8);
+
+    var maxKr = Math.max.apply(null, totals.map(function (t) { return t.sum / 100; }).concat([0]));
+    var step = niceStep(maxKr);
+    var topKr = Math.max(step, Math.ceil(maxKr / step) * step);
+    function yOf (kr) { return padT + plotH - (kr / topKr) * plotH; }
+
+    var svg = svgEl('svg', {
+      viewBox: '0 0 ' + W + ' ' + H, class: 'chart-svg', role: 'img',
+      'aria-label': (costMode === 'weeks' ? 'Kostnad per uke' : 'Kostnad per måned') + ', siste ' + n
+    });
+
+    var bandLayer = svgEl('g', {});
+    svg.appendChild(bandLayer);
+    for (var v = 0; v <= topKr + 0.001; v += step) {
+      var gy = Math.round(yOf(v)) + 0.5;
+      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: gy, y2: gy, class: 'chart-grid' }));
+      var tick = svgEl('text', { x: padL - 6, y: gy + 3.5, 'text-anchor': 'end', class: 'chart-tick' });
+      tick.textContent = groupThousands(Math.round(v));
+      svg.appendChild(tick);
+    }
+
+    var bars = [], labels = [], hits = [];
+    periods.forEach(function (p, i) {
+      var kr = totals[i].sum / 100;
+      var x = padL + i * slot + (slot - barW) / 2;
+      var h = (kr / topKr) * plotH;
+      var path = svgEl('path', {
+        d: barPath(x, padT + plotH - h, barW, h),
+        class: 'chart-bar' + (p.current ? ' is-partial' : '')
+      });
+      svg.appendChild(path);
+      bars.push({ x: x, h: h });
+      var lab = svgEl('text', { x: padL + i * slot + slot / 2, y: H - 7, 'text-anchor': 'middle', class: 'chart-x' });
+      lab.textContent = p.short;
+      svg.appendChild(lab);
+      labels.push(lab);
+    });
+
+    var valueLabel = svgEl('text', { 'text-anchor': 'middle', class: 'chart-value' });
+    svg.appendChild(valueLabel);
+
+    var wrap = el('div', { class: 'chart-wrap' });
+    var tip = null;
+    function hideTip () { if (tip && tip.parentNode) tip.parentNode.removeChild(tip); tip = null; }
+    function showTip (i) {
+      hideTip();
+      var leftPct = ((padL + i * slot + slot / 2) / W) * 100;
+      var topPct = ((padT + plotH - bars[i].h) / H) * 100;
+      tip = el('div', { class: 'chart-tip' }, [
+        el('strong', { text: formatKrRounded(totals[i].sum) }),
+        el('span', { text: periods[i].title + (periods[i].current ? ' · så langt' : '') })
+      ]);
+      tip.style.left = Math.min(86, Math.max(14, leftPct)) + '%';
+      tip.style.top = topPct + '%';
+      wrap.appendChild(tip);
+    }
+
+    /* Treffområdet er hele kolonnen, ikke bare søylen – også en tom uke kan velges. */
+    periods.forEach(function (p, i) {
+      var hit = svgEl('rect', {
+        x: padL + i * slot, y: padT - 4, width: slot, height: plotH + padB + 4,
+        class: 'chart-hit', tabindex: '0', role: 'button', 'data-index': String(i),
+        'aria-label': p.title + (p.current ? ' så langt' : '') + ': ' + formatKrRounded(totals[i].sum)
+      });
+      hit.addEventListener('click', function () { onSelect(i); });
+      hit.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(i); }
+        if (e.key === 'ArrowRight' && i < n - 1) { e.preventDefault(); hits[i + 1].focus(); onSelect(i + 1); }
+        if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); hits[i - 1].focus(); onSelect(i - 1); }
+      });
+      hit.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') showTip(i); });
+      hit.addEventListener('pointerleave', hideTip);
+      svg.appendChild(hit);
+      hits.push(hit);
+    });
+    wrap.appendChild(svg);
+
+    function select (i) {
+      while (bandLayer.firstChild) bandLayer.removeChild(bandLayer.firstChild);
+      bandLayer.appendChild(svgEl('rect', {
+        x: padL + i * slot + 1, y: padT - 20, width: slot - 2, height: plotH + 20, rx: 6, class: 'chart-band'
+      }));
+      labels.forEach(function (l, j) { l.setAttribute('class', 'chart-x' + (j === i ? ' is-selected' : '')); });
+      hits.forEach(function (h, j) { h.setAttribute('aria-pressed', String(j === i)); });
+      /* Bare den valgte søylen får tallet sitt – resten står i tabellen. */
+      var txt = formatKrRounded(totals[i].sum);
+      var half = txt.length * 3.1;
+      var cx = Math.min(W - padR - half, Math.max(padL + half, padL + i * slot + slot / 2));
+      /* Tallet står øverst i den markerte kolonnen, over selve plottet – der
+       * kan ingen nabosøyle være høyere og skjule det. */
+      valueLabel.setAttribute('x', cx);
+      valueLabel.setAttribute('y', padT - 8);
+      valueLabel.textContent = txt;
+    }
+
+    return { node: wrap, select: select };
+  }
+
+  /* Turene, nyeste først, gruppert per måned med månedens sum i overskriften. */
+  function buildTripList () {
+    var wrap = el('div', { class: 'trip-section' });
+    wrap.appendChild(el('div', { class: 'trip-section-head' }, [
+      el('h3', { text: 'Handleturer' }),
+      el('span', { text: state.trips.length + (state.trips.length === 1 ? ' tur' : ' turer') + ' registrert' })
+    ]));
+
+    var newest = state.trips.slice().reverse();
+    var LIMIT = 40;
+    var shown = costShowAllTrips ? newest : newest.slice(0, LIMIT);
+    var monthSums = {};
+    newest.forEach(function (t) { var k = t.date.slice(0, 7); monthSums[k] = (monthSums[k] || 0) + t.amount; });
+
+    var currentMonth = null, listEl = null;
+    shown.forEach(function (t) {
+      var mk = t.date.slice(0, 7);
+      if (mk !== currentMonth) {
+        currentMonth = mk;
+        var d0 = parseYmd(t.date);
+        wrap.appendChild(el('div', { class: 'trip-month' }, [
+          el('span', { text: capitalize(MONTH_NAMES[d0.getMonth()]) + ' ' + d0.getFullYear() }),
+          el('span', { text: formatKrRounded(monthSums[mk]) })
+        ]));
+        listEl = el('div', { class: 'trip-list' });
+        wrap.appendChild(listEl);
+      }
+      var d = parseYmd(t.date);
+      var row = el('button', { type: 'button', class: 'trip-item' }, [
+        el('span', {}, [
+          el('span', { class: 'trip-date', text: DAY_NAMES[(d.getDay() + 6) % 7] + ' ' + d.getDate() + '. ' + MONTH_SHORT[d.getMonth()] }),
+          t.addedBy ? el('span', { class: 'trip-who', text: t.addedBy }) : null
+        ]),
+        el('span', { class: 'trip-amount', text: formatKr(t.amount) })
+      ]);
+      row.addEventListener('click', function () { showTripModal(t); });
+      listEl.appendChild(row);
+    });
+
+    if (!costShowAllTrips && newest.length > LIMIT) {
+      var more = el('button', { type: 'button', class: 'trip-more', text: 'Vis alle ' + newest.length + ' turer' });
+      more.addEventListener('click', function () { costShowAllTrips = true; render(); });
+      wrap.appendChild(more);
+    }
+    return wrap;
+  }
+
+  function buildAskTripSetting () {
+    var box = el('input', { type: 'checkbox', class: 'ask-trip-toggle' });
+    box.checked = getAskTrip();
+    box.addEventListener('change', function () { setAskTrip(box.checked); });
+    return el('label', { class: 'setting-row' }, [
+      box,
+      el('span', {}, [
+        document.createTextNode('Spør hva handleturen kostet når jeg tømmer avkryssede varer'),
+        el('small', { text: 'Gjelder bare denne telefonen.' })
+      ])
+    ]);
+  }
+
+  /* ============================== kostnad: vinduer ============================== */
+
+  /* Registrere en ny tur, eller rette en som finnes. */
+  function showTripModal (trip, opts) {
+    opts = opts || {};
+    closeOverlay();
+    var today = todayDate();
+
+    var amountInput = el('input', {
+      type: 'text', inputmode: 'decimal', class: 'trip-amount-input', autocomplete: 'off',
+      placeholder: '0', value: trip ? amountInputValue(trip.amount) : '', 'aria-label': 'Beløp i kroner'
+    });
+    var dateInput = el('input', {
+      type: 'date', class: 'trip-date-input', value: trip ? trip.date : ymdOf(today),
+      max: ymdOf(today), min: oldestTripYmd(), 'aria-label': 'Dato'
+    });
+    var err = el('p', { class: 'field-error' });
+    err.style.display = 'none';
+
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: opts.afterClear ? 'Hopp over' : 'Avbryt' });
+    cancelBtn.addEventListener('click', closeOverlay);
+    var saveBtn = el('button', { class: 'primary', type: 'submit', text: 'Lagre' });
+
+    /* novalidate: appen sjekker selv og sier fra på norsk. Ellers stopper
+     * nettleseren en dato etter «max» med sin egen boble, og forklaringen
+     * under feltet kommer aldri fram. */
+    var form = el('form', { novalidate: '' }, [
+      el('div', { class: 'trip-field-row' }, [
+        el('label', {}, [el('span', { class: 'menu-field-label', text: 'Beløp (kr)' }), amountInput]),
+        el('label', {}, [el('span', { class: 'menu-field-label', text: 'Dato' }), dateInput])
+      ]),
+      err,
+      el('div', { class: 'modal-actions' }, [cancelBtn, saveBtn])
+    ]);
+    function fail (msg) { err.textContent = msg; err.style.display = ''; }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var ore = parseAmount(amountInput.value);
+      if (ore === null) { fail('Skriv beløpet som et tall, for eksempel 1247,80.'); amountInput.focus(); return; }
+      var d = parseYmd(dateInput.value);
+      if (!d) { fail('Velg en dato.'); return; }
+      if (d > today) { fail('Datoen kan ikke være fram i tid.'); return; }
+      if (ymdOf(d) < oldestTripYmd()) { fail('Handleturer tas bare vare på i to år.'); return; }
+      if (trip) updateTrip(trip.id, ymdOf(d), ore);
+      else addTrip(ymdOf(d), ore);
+      closeOverlay();
+      render();
+    });
+
+    var kids = [el('h2', { text: trip ? 'Rett handletur' : (opts.afterClear ? 'Hva kostet handleturen?' : 'Registrer handletur') })];
+    if (opts.afterClear) kids.push(el('p', { text: 'De avkryssede varene er fjernet fra listen.' }));
+    kids.push(form);
+
+    var extras = [];
+    if (trip) {
+      var tripDate = parseYmd(trip.date);
+      var menuLink = el('button', { type: 'button', class: 'link-btn trip-week-link', text: 'Se ukesmenyen for uke ' + isoWeek(tripDate).week });
+      menuLink.addEventListener('click', function () { showWeekMenuModal(mondayOf(tripDate)); });
+      var delLink = el('button', { type: 'button', class: 'link-btn danger trip-delete-link', text: 'Slett turen' });
+      delLink.addEventListener('click', function () {
+        showConfirmModal({
+          title: 'Slette handleturen?',
+          description: formatKr(trip.amount) + ' den ' + tripDate.getDate() + '. ' + MONTH_NAMES[tripDate.getMonth()] + ' fjernes fra oversikten.',
+          confirmLabel: 'Slett',
+          cancelLabel: 'Avbryt',
+          danger: true,
+          onConfirm: function () { deleteTrip(trip.id); render(); },
+          onCancel: function () { showTripModal(trip); }
+        });
+      });
+      extras.push(menuLink, delLink);
+    }
+    if (opts.afterClear) {
+      var stopLink = el('button', { type: 'button', class: 'link-btn trip-stop-link', text: 'Ikke spør meg igjen på denne telefonen' });
+      stopLink.addEventListener('click', function () { setAskTrip(false); closeOverlay(); });
+      extras.push(stopLink);
+    }
+    if (extras.length) kids.push(el('div', { class: 'trip-extra' }, extras));
+
+    var modal = el('div', { class: 'modal wide trip-modal' }, kids);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+    if (!trip) setTimeout(function () { amountInput.focus(); }, 30);
+  }
+
+  /* Ukesmenyen slik den var en gitt uke – fra hoveddokumentet eller arkivet –
+   * med hva som ble brukt den uka øverst. */
+  function showWeekMenuModal (weekStart) {
+    closeOverlay();
+    var start = mondayOf(weekStart);
+    var key = weekKeyOf(start);
+    var wk = isoWeek(start).week;
+    var spent = sumTrips(start, addDays(start, 6));
+
+    var body = el('div', { class: 'week-menu-list' }, [el('p', { class: 'menu-pick-empty', text: 'Henter ukesmenyen …' })]);
+    var actions = [];
+    var weeks = menuWeeks();
+    var liveIdx = key === weeks[0].key ? 0 : (key === weeks[1].key ? 1 : -1);
+    if (liveIdx !== -1) {
+      var openBtn = el('button', { class: 'secondary', type: 'button', text: 'Åpne i Uka' });
+      openBtn.addEventListener('click', function () { closeOverlay(); menuWeekOffset = liveIdx; setView('menu'); });
+      actions.push(openBtn);
+    }
+    var closeBtn = el('button', { class: 'secondary', type: 'button', text: 'Lukk' });
+    closeBtn.addEventListener('click', closeOverlay);
+    actions.push(closeBtn);
+
+    var modal = el('div', { class: 'modal wide week-menu-modal' }, [
+      el('h2', { text: 'Ukesmenyen uke ' + wk }),
+      el('p', { text: weekRangeLabel(start) }),
+      el('p', {
+        class: 'week-menu-spent', text: spent.count
+          ? 'Brukt denne uka: ' + formatKr(spent.sum) + ' på ' + spent.count + (spent.count === 1 ? ' tur' : ' turer')
+          : 'Ingen handleturer registrert denne uka.'
+      }),
+      body,
+      el('div', { class: 'modal-actions' }, actions)
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
+
+    loadWeekMenu(key).then(function (rows) {
+      if (!body.isConnected) return;
+      body.innerHTML = '';
+      var any = false;
+      for (var d = 0; d < 7; d++) {
+        var entry = null;
+        rows.forEach(function (r) { if (r.day === d) entry = r; });
+        var date = addDays(start, d);
+        var recipe = entry && entry.recipeId ? findRecipe(entry.recipeId) : null;
+        var dishName = entry && entry.recipeId ? (recipe ? recipe.name : entry.recipeName) : '';
+        if (dishName || (entry && entry.note)) any = true;
+        body.appendChild(el('div', { class: 'week-menu-row' }, [
+          el('div', { class: 'week-menu-day' }, [
+            el('strong', { text: DAY_NAMES[d] }),
+            document.createTextNode(date.getDate() + '. ' + MONTH_SHORT[date.getMonth()])
+          ]),
+          el('div', { class: 'week-menu-dish' + (dishName ? '' : ' is-empty') }, [
+            document.createTextNode(dishName || '–'),
+            entry && entry.note ? el('span', { class: 'week-menu-note', text: entry.note }) : null
+          ])
+        ]));
+      }
+      if (!any) {
+        body.innerHTML = '';
+        body.appendChild(el('p', { class: 'menu-pick-empty', text: 'Ingen ukesmeny ble satt opp denne uka.' }));
+      }
+    }).catch(function (err) {
+      if (!body.isConnected) return;
+      body.innerHTML = '';
+      body.appendChild(el('p', {
+        class: 'menu-pick-empty', text: isPermissionError(err)
+          ? 'Arkivet er ikke tilgjengelig ennå – de nye reglene må limes inn i Firebase.'
+          : 'Eldre uker hentes fra arkivet, og det krever nett. Prøv igjen når du er tilkoblet.'
+      }));
+    });
   }
 
   function buildRecipesView (activeList) {
@@ -3556,6 +4468,39 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     list.items = list.items.filter(function (i) { return !i.checked; });
     renderListOnly();
     scheduleSave();
+    /* Å tømme de avkryssede varene er slutten på en handletur – det naturlige
+     * øyeblikket å spørre hva den kostet. Kan slås av per telefon. */
+    if (getAskTrip()) showTripModal(null, { afterClear: true });
+  }
+
+  /* ============================== handleturer: handlinger ============================== */
+
+  function findTrip (id) {
+    for (var i = 0; i < state.trips.length; i++) if (state.trips[i].id === id) return state.trips[i];
+    return null;
+  }
+  /* Turene holdes sortert på dato, også rett etter at du har lagt inn en tur
+   * med en eldre dato – ellers havner den feil i listen til neste synkronisering. */
+  function sortTrips () { state.trips = canonicalTrips(state.trips, state.tombstones); }
+  function addTrip (ymd, ore) {
+    var now = nextCreatedAt();
+    state.trips.push({ id: uid(), date: ymd, amount: ore, addedBy: getName() || null, createdAt: now, updatedAt: now });
+    sortTrips();
+    scheduleSave();
+  }
+  function updateTrip (id, ymd, ore) {
+    var t = findTrip(id);
+    if (!t) return;
+    t.date = ymd;
+    t.amount = ore;
+    t.updatedAt = Date.now();
+    sortTrips();
+    scheduleSave();
+  }
+  function deleteTrip (id) {
+    tombstone('trips', id);
+    state.trips = state.trips.filter(function (t) { return t.id !== id; });
+    scheduleSave();
   }
 
   /* ============================== recipe actions ============================== */
@@ -3748,6 +4693,106 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * funksjon fra Firebase, og tomme dokumenter tar ingen plass av betydning. */
   function clearRecipeImage (recipeId) {
     return saveRecipeImage(recipeId, '', '');
+  }
+
+  /* ============================== menyarkivet ==============================
+   * Ett dokument per år («2026»), med samme dag-rader som i ukesmenyen. Uker
+   * som har rullet ut av vinduet flyttes hit, og hentes bare når noen ber om
+   * å se en gammel uke fra Kostnad. */
+
+  var archiveCache = {};       // år -> rader, så samme år ikke hentes to ganger
+  var archiveBusy = false;
+  var archiveTimer = null;
+  /* null = alt i orden, 'rules' = Firebase sier nei (reglene er ikke limt inn),
+   * 'network' = midlertidig feil. Vises i Kostnad, så det ikke feiler i stillhet. */
+  var archiveProblem = null;
+
+  function archiveRef (year) {
+    if (!fbDb) return null;
+    return doc(fbDb, ARCHIVE_COLLECTION, String(year));
+  }
+  function archiveYearOf (weekKey) { return weekKey.slice(0, 4); }
+  function isPermissionError (err) {
+    var code = err && err.code;
+    return code === 'permission-denied' || code === 'firestore/permission-denied';
+  }
+  function canonicalArchive (rows) {
+    var cutoff = oldestHistoryWeekKey();
+    return rows
+      .filter(function (d) { return d.week >= cutoff; })
+      .sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+  }
+  function readArchiveYear (year) {
+    if (archiveCache[year]) return Promise.resolve(archiveCache[year]);
+    var ref = archiveRef(year);
+    if (!ref) return Promise.reject(new Error('offline'));
+    return getDoc(ref).then(function (snap) {
+      var rows = normalizeMenu(snap.exists() ? (snap.data() || {}).menu : null);
+      archiveCache[year] = rows;
+      return rows;
+    });
+  }
+
+  /* Flytter uker eldre enn vinduet over i arkivet, og fjerner dem fra
+   * hoveddokumentet først når arkivet har bekreftet at de er lagret. Går noe
+   * galt, blir ukene liggende der de var – ingenting går tapt. To telefoner
+   * kan gjøre dette samtidig: arkivet leses og flettes før det skrives, og
+   * flettingen er den samme som i selve ukesmenyen. */
+  function archiveOldWeeks () {
+    if (!isWriter || !fbDb || archiveBusy) return;
+    var cutoff = oldestKeptWeekKey();
+    var old = state.menu.filter(function (d) { return d.week < cutoff; });
+    if (!old.length) return;
+
+    archiveBusy = true;
+    var byYear = {};
+    old.forEach(function (d) {
+      var y = archiveYearOf(d.week);
+      (byYear[y] = byYear[y] || []).push(d);
+    });
+
+    Promise.all(Object.keys(byYear).map(function (year) {
+      /* Les alltid på nytt her – den andre telefonen kan ha arkivert noe siden sist. */
+      delete archiveCache[year];
+      return readArchiveYear(year).then(function (existing) {
+        var merged = canonicalArchive(mergeById(existing, byYear[year], mergeMenuDays));
+        if (stableJson(merged) === stableJson(existing)) return;   // alt lå der allerede
+        return setDoc(archiveRef(year), { menu: merged, updatedAt: Date.now() })
+          .then(function () { archiveCache[year] = merged; });
+      });
+    })).then(function () {
+      var moved = {};
+      old.forEach(function (d) { moved[d.id] = d; });
+      /* Bare rader som ikke er endret mens vi holdt på, fjernes. */
+      state.menu = state.menu.filter(function (d) {
+        return !(moved[d.id] && stableJson(moved[d.id]) === stableJson(d));
+      });
+      archiveProblem = null;
+      scheduleSave();
+    }).catch(function (err) {
+      archiveProblem = isPermissionError(err) ? 'rules' : 'network';
+      if (currentView === 'costs') render();
+    }).then(function () {
+      archiveBusy = false;
+    });
+  }
+  function scheduleArchive () {
+    clearTimeout(archiveTimer);
+    archiveTimer = setTimeout(archiveOldWeeks, 1500);
+  }
+
+  /* Alle sju dagene i en uke, uansett hvor de ligger: i hoveddokumentet, i
+   * arkivet, eller – rett etter at uken rullet ut – litt i begge. */
+  function loadWeekMenu (weekKey) {
+    var live = state.menu.filter(function (d) { return d.week === weekKey; });
+    if (weekKey >= oldestKeptWeekKey()) return Promise.resolve(live);
+    if (!isWriter || !fbDb) {
+      return live.length ? Promise.resolve(live) : Promise.reject(new Error('offline'));
+    }
+    return readArchiveYear(archiveYearOf(weekKey)).then(function (rows) {
+      var archived = rows.filter(function (d) { return d.week === weekKey; });
+      return mergeById(archived, live, mergeMenuDays);
+    });
   }
 
   function setRecipeRating (id, value) {
@@ -3961,6 +5006,9 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
        * hadde endringer den ikke kjente til – sender vi resultatet tilbake, så
        * begge telefoner ender på nøyaktig samme liste. */
       if (!snap.exists() || !sameState(state, remote)) scheduleSave();
+      /* Har noen uker rullet ut av vinduet, flyttes de til arkivet. */
+      var weekCutoff = oldestKeptWeekKey();
+      if (state.menu.some(function (d) { return d.week < weekCutoff; })) scheduleArchive();
     }, function () {
       setStatus('error');
     });
