@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '031020261157';
+  var APP_VERSION = '051020261112';
 
   /* ============================== styling ============================== */
 
@@ -1339,24 +1339,118 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     };
   }
 
+  /* ---------- mengder i varenavn ----------
+   * En vare fra en oppskrift heter «kyllinglårfilet (800 g)» – mengden står i
+   * navnet. Uten å se inn i parentesen er «(800 g)» og «(400 g)» to ulike
+   * varer, og de havnet på hver sin rad. Her leses mengden ut, slik at like
+   * varer kan legges sammen: 800 g + 400 g blir 1200 g. */
+
+  /* Vekt og volum kan regnes om innbyrdes. Faktoren er mot g eller ml. */
+  var AMOUNT_UNITS = {
+    g: ['w', 1], gram: ['w', 1], hg: ['w', 100], kg: ['w', 1000],
+    ml: ['v', 1], cl: ['v', 10], dl: ['v', 100], l: ['v', 1000], liter: ['v', 1000]
+  };
+  /* Enhetene vi skriver ut når to ulike enheter slås sammen – største først. */
+  var AMOUNT_LADDER = { w: [['kg', 1000], ['g', 1]], v: [['l', 1000], ['dl', 100], ['ml', 1]] };
+  /* Andre enheter legges bare sammen med seg selv, men entall og flertall
+   * er samme enhet: 1 stilk + 2 stilker = 3 stilker. */
+  var UNIT_PLURALS = {
+    boks: 'bokser', 'dåse': 'dåser', pose: 'poser', skive: 'skiver', potte: 'potter',
+    terning: 'terninger', bunt: 'bunter', klype: 'klyper', neve: 'never', kopp: 'kopper',
+    cup: 'cups', stilk: 'stilker', stang: 'stenger', hode: 'hoder', bit: 'biter'
+  };
+  var UNIT_SINGULARS = { pakke: 'pk', pakker: 'pk' };
+  Object.keys(UNIT_PLURALS).forEach(function (k) { UNIT_SINGULARS[UNIT_PLURALS[k]] = k; });
+
+  var ITEM_AMOUNT_RE = /^(.*\S)\s*\(([^()]+)\)\s*$/;
+  var AMOUNT_TEXT_RE = /^(\d+(?:[.,]\d+)?|\d+\s*\/\s*\d+|[½¼¾])\s*([a-zæøå]+\.?)?$/i;
+
+  function normalizeUnit (u) {
+    u = (u || '').toLowerCase().replace(/\.$/, '');
+    return UNIT_SINGULARS[u] || u;
+  }
+
+  /* Deler «kyllinglårfilet (800 g)» i navn og mengde. Er parentesen ikke en
+   * mengde vi kan regne med – «(usaltet)», «(1-2 ss)» – er hele teksten navnet. */
+  function splitItemName (name) {
+    var m = ITEM_AMOUNT_RE.exec(name || '');
+    if (!m) return { base: name || '', amount: null };
+    var a = AMOUNT_TEXT_RE.exec(m[2].trim());
+    var value = a ? parseNum(a[1]) : null;
+    if (value === null || !(value > 0)) return { base: name, amount: null };
+    var unit = normalizeUnit(a[2]);
+    var conv = AMOUNT_UNITS[unit];
+    return {
+      base: m[1],
+      amount: { value: value, unit: unit, family: conv ? conv[0] : 'u:' + unit, factor: conv ? conv[1] : 1 }
+    };
+  }
+
+  function formatAmountValue (n) {
+    var r = Math.round(n * 100) / 100;
+    if (r >= 100) r = Math.round(r);
+    return String(r).replace('.', ',');
+  }
+
+  /* Legger sammen to mengder av samme slag. Antallet på raden telles med:
+   * «kjøttdeig (400 g)» × 2 er 800 g. Samme enhet beholdes; ulike enheter
+   * skrives i den største av dem – 800 g + 1 kg blir 1,8 kg – men aldri som
+   * et tall under 1, så 300 g + 0,5 kg blir 800 g og ikke 0,8 kg. */
+  function combineAmounts (a, aQty, b, bQty) {
+    var total = a.value * a.factor * aQty + b.value * b.factor * bQty;
+    var unit, factor;
+    if (a.unit === b.unit) {
+      unit = a.unit; factor = a.factor;
+    } else {
+      var ladder = AMOUNT_LADDER[a.family];
+      var top = Math.max(a.factor, b.factor);
+      var i = 0;
+      while (i < ladder.length - 1 && ladder[i][1] > top) i++;
+      while (i < ladder.length - 1 && total / ladder[i][1] < 1) i++;
+      unit = ladder[i][0]; factor = ladder[i][1];
+    }
+    var value = total / factor;
+    if (Math.abs(value - 1) > 1e-9 && UNIT_PLURALS[unit]) unit = UNIT_PLURALS[unit];
+    return formatAmountValue(value) + (unit ? ' ' + unit : '');
+  }
+
   /* To varer med samme navn (og samme avkrysset-status) i samme liste slås
-   * sammen til én rad, og antallet legges sammen – akkurat som når du skriver
-   * inn den samme varen to ganger selv. Den som ble lagt inn først beholdes,
-   * slik at begge telefoner ender på nøyaktig samme rad. */
+   * sammen til én rad. Uten mengde legges antallet sammen – akkurat som når du
+   * skriver inn den samme varen to ganger selv. Med mengde legges mengdene
+   * sammen: «(800 g)» og «(400 g)» blir én rad med «(1200 g)». Den som ble lagt
+   * inn først beholdes, slik at begge telefoner ender på nøyaktig samme rad.
+   *
+   * Raden som blir stående får et tidsstempel som er høyere enn begge de to
+   * den ble laget av. Ellers kunne en eldre kopi av den samme raden på den
+   * andre telefonen vunnet ved neste synkronisering – og tatt med seg den
+   * gamle mengden. */
+  function itemMergeKey (it) {
+    var parts = splitItemName(it.name);
+    return (parts.amount
+      ? 'a|' + parts.base.toLowerCase() + '|' + parts.amount.family
+      : 'n|' + it.name.toLowerCase()) + '|' + (it.checked ? '1' : '0');
+  }
   function dedupeItems (items, tomb) {
     var seen = {};
     var out = [];
     items.forEach(function (it) {
-      var key = it.name.toLowerCase() + '|' + (it.checked ? '1' : '0');
-      if (seen[key]) {
-        var keep = seen[key];
-        keep.qty = Math.min(999, keep.qty + it.qty);
-        keep.updatedAt = Math.max(keep.updatedAt, it.updatedAt);
-        tomb.items[it.id] = Math.max(tomb.items[it.id] || 0, Date.now());
-      } else {
+      var key = itemMergeKey(it);
+      var keep = seen[key];
+      if (!keep) {
         seen[key] = it;
         out.push(it);
+        return;
       }
+      var mine = splitItemName(keep.name);
+      var theirs = splitItemName(it.name);
+      if (mine.amount && theirs.amount) {
+        keep.name = mine.base + ' (' + combineAmounts(mine.amount, keep.qty, theirs.amount, it.qty) + ')';
+        keep.qty = 1;
+      } else {
+        keep.qty = Math.min(999, keep.qty + it.qty);
+      }
+      keep.updatedAt = Math.max(keep.updatedAt, it.updatedAt) + 1;
+      tomb.items[it.id] = Math.max(tomb.items[it.id] || 0, Date.now());
     });
     return out;
   }
@@ -1899,8 +1993,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     });
   }
   function overwriteSavedMenu (menu, weekKey) {
-    menu.days = weekAsSavedDays(weekKey);
-    menu.updatedAt = Date.now();
+    /* Slås opp på nytt på id: vinduet kan ha stått oppe mens en synkronisering
+     * byttet ut tilstanden, og da er objektet vi fikk med oss en gammel kopi. */
+    var live = null;
+    state.savedMenus.forEach(function (m) { if (m.id === menu.id) live = m; });
+    if (!live) return;
+    live.days = weekAsSavedDays(weekKey);
+    live.updatedAt = Date.now();
   }
   /* Setter en lagret uke inn på den uken du står på. Retter som er slettet i
    * mellomtiden hoppes over – da står dagen tom i stedet for å peke i løse
@@ -2442,9 +2541,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
         'aria-label': 'Legg ' + recipe.name + ' i handlelisten'
       });
       addBtn.addEventListener('click', function () {
-        addRecipeToList(activeList, recipe, 1);
+        /* Listen og retten hentes på nytt i det du trykker. En synkronisering
+         * fra den andre telefonen bytter ut tilstanden, og da ville varene
+         * ellers havnet i en gammel kopi av listen som ingen ser. */
+        var list = getActiveList();
+        addRecipeToList(list, findRecipe(recipe.id) || recipe, 1);
         scheduleSave();
-        flashOnCard(card, 'Lagt i «' + activeList.name + '»');
+        flashOnCard(card, 'Lagt i «' + list.name + '»');
       });
       card.appendChild(addBtn);
     }
@@ -2574,7 +2677,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       confirmLabel: 'Legg til',
       cancelLabel: 'Avbryt',
       onConfirm: function () {
-        planned.forEach(function (p) { addRecipeToList(activeList, p.recipe, 1); });
+        /* Hentes på nytt i det du bekrefter, ikke da vinduet ble åpnet:
+         * kommer det en synkronisering mens vinduet står oppe, er både listen
+         * og ukesmenyen byttet ut med nye kopier. Uten dette havnet hele
+         * ukas varer i en gammel liste som ikke lenger vises. */
+        var list = getActiveList();
+        plannedDays(week.key).forEach(function (p) { addRecipeToList(list, p.recipe, 1); });
         currentView = 'lists';
         render();
         scheduleSave();
@@ -4388,32 +4496,71 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return found;
   }
 
+  /* Legger en vare i listen, og slår den sammen med en som står der fra før:
+   *  – samme navn uten mengde: antallet økes, som før
+   *  – samme vare med mengde av samme slag: mengdene legges sammen
+   *    («kyllinglårfilet (800 g)» + «(400 g)» → «(1200 g)»)
+   *  – samme vare, men mengder som ikke kan legges sammen («1 pk» og «400 g»):
+   *    en ny rad, plassert rett under den forrige, så de står samlet. */
   function mergeItemIntoList (list, name, qty, adder) {
     name = normalizeName(name);
     if (!name) return;
     qty = normalizeQty(qty);
-    var match = null;
-    for (var i = 0; i < list.items.length; i++) {
-      var it = list.items[i];
-      if (!it.checked && it.name.toLowerCase() === name.toLowerCase()) { match = it; break; }
-    }
+    var lower = name.toLowerCase();
+    var incoming = splitItemName(name);
+    var baseLower = incoming.base.toLowerCase();
+
+    var exact = null, combine = null, combineParts = null, lastSameBase = null;
+    list.items.forEach(function (it) {
+      if (it.checked) return;
+      var parts = splitItemName(it.name);
+      if (!incoming.amount && !exact && it.name.toLowerCase() === lower) exact = it;
+      if (parts.base.toLowerCase() !== baseLower) return;
+      if (incoming.amount && !combine && parts.amount && parts.amount.family === incoming.amount.family) {
+        combine = it; combineParts = parts;
+      }
+      if (!lastSameBase || it.addedAt >= lastSameBase.addedAt) lastSameBase = it;
+    });
+
     var now = Date.now();
-    if (match) {
-      match.qty = Math.min(999, match.qty + qty);
-      match.updatedAt = now;
-    } else {
-      list.items.push({
-        id: uid(),
-        name: name,
-        qty: qty,
-        checked: false,
-        addedBy: adder || null,
-        checkedBy: null,
-        addedAt: now,
-        updatedAt: now,
-        checkedAt: now
-      });
+    if (exact) {
+      exact.qty = Math.min(999, exact.qty + qty);
+      exact.updatedAt = now;
+      return;
     }
+    if (combine) {
+      combine.name = combineParts.base + ' (' + combineAmounts(combineParts.amount, combine.qty, incoming.amount, qty) + ')';
+      combine.qty = 1;
+      combine.updatedAt = now;
+      return;
+    }
+
+    var item = {
+      id: uid(),
+      name: name,
+      qty: qty,
+      checked: false,
+      addedBy: adder || null,
+      checkedBy: null,
+      /* Stigende tidsstempler, også når mange varer legges inn i samme
+       * millisekund: da står varene i den rekkefølgen de ble lagt til. */
+      addedAt: nextCreatedAt(),
+      updatedAt: now,
+      checkedAt: now
+    };
+    if (lastSameBase) {
+      /* Listen sorteres på når varen ble lagt til. Et tidspunkt midt mellom
+       * forrige rad av samme vare og raden etter den gjør at de to blir
+       * stående sammen – på begge telefonene. */
+      var after = null;
+      list.items.forEach(function (it) {
+        if (it.addedAt > lastSameBase.addedAt && (after === null || it.addedAt < after)) after = it.addedAt;
+      });
+      item.addedAt = after === null ? lastSameBase.addedAt + 1 : (lastSameBase.addedAt + after) / 2;
+      list.items.splice(list.items.indexOf(lastSameBase) + 1, 0, item);
+      return;
+    }
+    list.items.push(item);
   }
 
   function addItem (listId, name, qty) {
@@ -4977,13 +5124,20 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     });
   }
 
+  function rawItemCount (s) {
+    var n = 0;
+    if (s && Array.isArray(s.lists)) s.lists.forEach(function (l) { if (l && Array.isArray(l.items)) n += l.items.length; });
+    return n;
+  }
+
   function startListening () {
     isWriter = true;
     fbUnsubscribe = onSnapshot(fbDocRef, function (snap) {
       /* Vi FLETTER skyens versjon med vår egen i stedet for å la den ene
        * overskrive den andre. Da overlever både det den andre telefonen har
        * gjort og det vi selv rakk å gjøre uten nett. */
-      var remote = migrateState(snap.exists() ? snap.data() : null);
+      var raw = snap.exists() ? snap.data() : null;
+      var remote = migrateState(raw);
       // If only item contents changed (the common case — you or your partner adding/
       // checking/removing items), patch just the list section so a remote update never
       // steals focus out of whatever you're typing. A structural change (list added/
@@ -5005,7 +5159,11 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       /* Ga sammenslåingen noe annet enn det som lå i skyen – typisk fordi vi
        * hadde endringer den ikke kjente til – sender vi resultatet tilbake, så
        * begge telefoner ender på nøyaktig samme liste. */
-      if (!snap.exists() || !sameState(state, remote)) scheduleSave();
+      /* Ble skyens versjon ryddet da den ble lest inn – dobbeltrader slått
+       * sammen, slettede varer fjernet – sender vi den ryddede versjonen
+       * tilbake. Ellers ville rotet blitt liggende i skyen, og hver telefon
+       * måtte rydde det på nytt hver gang. */
+      if (!snap.exists() || !sameState(state, remote) || rawItemCount(raw) !== rawItemCount(remote)) scheduleSave();
       /* Har noen uker rullet ut av vinduet, flyttes de til arkivet. */
       var weekCutoff = oldestKeptWeekKey();
       if (state.menu.some(function (d) { return d.week < weekCutoff; })) scheduleArchive();
