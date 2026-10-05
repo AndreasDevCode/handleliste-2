@@ -150,7 +150,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
    * skilletegn (ddmmååååttmm), satt da filene ble laget. Vises nederst i
    * appen, slik at du kan se om telefonen kjører den siste versjonen du
    * lastet opp. Oppdateres av bump_version.sh. */
-  var APP_VERSION = '051020261139';
+  var APP_VERSION = '051020261436';
 
   /* ============================== styling ============================== */
 
@@ -295,6 +295,17 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     'section.list-section{display:flex;flex-direction:column;gap:8px;}',
     '.group-label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 2px 2px;}',
     '.group-label:first-child{margin-top:0;}',
+    '.cat-label{',
+    '  display:flex;align-items:baseline;justify-content:space-between;gap:8px;',
+    '  font-family:inherit;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;',
+    '  color:var(--accent);margin:16px 4px 6px;',
+    '}',
+    '.cat-label:first-child{margin-top:2px;}',
+    '.cat-count{font-weight:600;color:var(--muted);letter-spacing:0;font-variant-numeric:tabular-nums;}',
+    '.item-body.is-tappable{cursor:pointer;border-radius:6px;}',
+    '.item-body.is-tappable:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}',
+    'li.item.is-new{box-shadow:0 0 0 2px var(--accent);}',
+    '@media (prefers-reduced-motion: no-preference){ li.item{transition:box-shadow .4s ease;} }',
     'ul.item-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}',
     'li.item{',
     '  display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line);',
@@ -1453,6 +1464,102 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     return formatAmountValue(value) + (unit ? ' ' + unit : '');
   }
 
+  /* ---------- varegrupper ----------
+   * Handlelisten vises gruppert i den rekkefølgen man går gjennom en vanlig
+   * butikk. Appen kjenner igjen vanlige varer selv; havner noe feil, trykker
+   * man på varen og flytter den, og valget huskes for den varen (se
+   * state.categories) – på begge telefonene. */
+  var CATEGORIES = [
+    { key: 'frukt',  label: 'Frukt og grønt' },
+    { key: 'bakeri', label: 'Brød og bakeri' },
+    { key: 'kjott',  label: 'Kjøtt og fisk' },
+    { key: 'kjol',   label: 'Kjølevarer' },
+    { key: 'frys',   label: 'Frysevarer' },
+    { key: 'torr',   label: 'Tørrvarer' },
+    { key: 'drikke', label: 'Drikke' },
+    { key: 'annet',  label: 'Annet' }
+  ];
+  var CATEGORY_LABEL = {};
+  CATEGORIES.forEach(function (c) { CATEGORY_LABEL[c.key] = c.label; });
+
+  /* Første regel som treffer, vinner. Rekkefølgen er hele poenget:
+   *  – frys først: «frosne erter» er frys, ikke grønt
+   *  – noen sammensatte ord før de store gruppene: «rødvinseddik» er ikke
+   *    drikke, «fiskeboller» er ikke bakeri, «fersk gjær» ligger på kjøl
+   *  – tørrvarer før grønt og kjøl: «hermetiske tomater», «malt ingefær»,
+   *    «tørket timian», «kokosmelk», «kyllingbuljong» og «tomatpuré» er alle
+   *    tørrvarer selv om de inneholder ordet for en fersk vare
+   *  – bakeri før kjøtt: «pølsebrød» er brød
+   *
+   * Ordgrenser skrives som mellomrom. JavaScripts \b regner ikke æ, ø og å
+   * som bokstaver – da traff «te» midt i «fløte», og fløten havnet i Drikke.
+   * Navnet gjøres derfor om til « ord ord » med bare bokstaver før testen:
+   * « te » er ordet te alene, «mel » er et ord som slutter på mel (hvetemel,
+   * rugmel), « kylling» et ord som begynner med kylling. */
+  var CATEGORY_RULES = [
+    ['frys',   / (frossen|frosne|frosset|fryst|frosen) |frysepizza|fiskepinner|pommes frites| is |iskrem|isbit/],
+    ['torr',   /eddik/],
+    ['kjol',   /fersk gjær|kaffefløte/],
+    ['frukt',  /(sitron|lime)saft|sukkererter/],
+    ['kjott',  /fiskebolle|fiskekake|kjøttbolle|kjøttkake/],
+    ['drikke', /juice| jus |brus | cola |mineralvann|farris| øl |rødvin|hvitvin| vin |vermouth| kaffe | te |teposer|saft |smoothie/],
+    ['torr',   /pulver| malt |tørket|tørkede|hermetisk|passata|tomatpur|ketchup|sennep|buljong| fond |kraft |terning|krydder|karri|gurkemeie|garam|kanel|muskat|allehånde|spisskummen|chiliflak| pepper | salt |oregano|spice|laurbær|sukker|mel |maisenna|bakepulver|natron|gjær|kakao|sjokolade|ris |risotto|pasta|spaghetti|tagliatelle|penne|fusilli|makaroni|lasagneplate|nudler|couscous|bulgur|byggryn|havregryn|müsli|cornflakes|linser|kikerter|bønner|nøtter|nøtt |mandler|pinjekjern|cashew|peanøtt|frø |rosiner|olje|soya|oystersaus|østerssaus|hoisin|sriracha|saus |salsa|pesto|honning|sirup|syltetøy|tyttebær|kokosmelk|tortilla|taco|knekkebrød|kjeks|chips|potetgull|popcorn|suppe|rasp |tunfisk|sammalt|hvete |kapers|oliven |maiskorn/],
+    ['bakeri', /brød|rundstykk|baguette|bagett|ciabatta|focaccia| loff |lompe|pitabrød|naan| wraps? |lefse|croissant|polarbrød/],
+    ['kjott',  /kjøtt|kylling|kalkun|and |andebryst|andelår|svin|ribbe|kotelett|skinke|bacon|pølse|chorizo|salami|pepperoni| lam |lamme|biff|entrec[oô]te|indrefilet|ytrefilet|høyrygg|okse|storfe|karbonade|reinsdyr| elg|hjort|vilt |torsk|laks| sei |hyse|ørret|makrell|reker|scampi|kamskjell|blåskjell|fisk|guanciale|pancetta|knoke/],
+    ['kjol',   /fløte|rømme|crème|creme fraiche|yoghurt|kesam|cottage|kefir|melk|smør|margarin|ost |osten |parmesan|mozzarella|feta|cheddar|ricotta|mascarpone| brie | egg|pålegg|leverpostei|hummus|majones|remulade|tzatziki|pizzadeig|butterdeig/],
+    ['frukt',  /frukt|grønt|eple|appelsin|banan|pære|druer|sitron| lime |melon|bær |ananas|mango|avokado|kiwi|klementin|mandarin|tomat|agurk|salat|spinat|ruccola|kål|brokkoli|gulrot|gulrøtter|gulerot|gulerøtter|potet|løk|purre|paprika|chili|squash|aubergine|sopp|sjampinjong|mais|erter|selleri|persille|pastinakk|rødbet|fennikel|ingefær|koriander|basilikum|gressløk|dill|mynte|timian|rosmarin|urter|asparges|reddik|rabarbra|nepe|sitrongress/]
+  ];
+
+  function categoryKeyOfName (name) {
+    return normalizeName(splitItemName(name).base).toLowerCase();
+  }
+  function matchCategory (text) {
+    var b = ' ' + text.replace(/[^a-zæøåéèêôüä]+/g, ' ').trim() + ' ';
+    for (var i = 0; i < CATEGORY_RULES.length; i++) {
+      if (CATEGORY_RULES[i][1].test(b)) return CATEGORY_RULES[i][0];
+    }
+    return null;
+  }
+  /* Gjenkjenner gruppen ut fra navnet, uten mengden i parentesen. Står det
+   * «smør eller olje», er det det første alternativet som teller – men er
+   * det første bare et beskrivende ord («røkt eller lettsaltet svineknoke»),
+   * leses hele navnet. */
+  function guessCategory (base) {
+    var full = (base || '').toLowerCase();
+    var first = full.split(' eller ')[0];
+    return matchCategory(first) || matchCategory(full) || 'annet';
+  }
+  function categoryOverride (key) {
+    var list = state.categories || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === key) return list[i].cat;
+    return null;
+  }
+  function categoryOfItem (item) {
+    var key = categoryKeyOfName(item.name);
+    return categoryOverride(key) || guessCategory(key);
+  }
+
+  function normalizeCategories (raw) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function (c) {
+      var id = normalizeName(c && c.id).toLowerCase().slice(0, 80);
+      var cat = c && c.cat;
+      if (!id || !CATEGORY_LABEL[cat]) return;
+      out.push({ id: id, cat: cat, updatedAt: num(c && c.updatedAt, 0) });
+    });
+    return out;
+  }
+  function mergeCategories (a, b) {
+    var base = pickNewer(a, b, 'updatedAt');
+    return { id: a.id, cat: base.cat, updatedAt: Math.max(a.updatedAt, b.updatedAt) };
+  }
+  function canonicalCategories (list) {
+    return (list || [])
+      .filter(function (c) { return CATEGORY_LABEL[c.cat]; })
+      .sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+  }
+
   /* To varer med samme navn (og samme avkrysset-status) i samme liste slås
    * sammen til én rad. Uten mengde legges antallet sammen – akkurat som når du
    * skriver inn den samme varen to ganger selv. Med mengde legges mengdene
@@ -1522,7 +1629,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       .sort(byField('createdAt'));
     return {
       lists: lists, recipes: recipes, menu: canonicalMenu(s.menu), savedMenus: savedMenus,
-      trips: canonicalTrips(s.trips, tomb), tombstones: tomb
+      trips: canonicalTrips(s.trips, tomb), categories: canonicalCategories(s.categories),
+      tombstones: tomb
     };
   }
 
@@ -1535,6 +1643,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (!Array.isArray(s.menu)) s.menu = [];
     if (!Array.isArray(s.savedMenus)) s.savedMenus = [];
     if (!Array.isArray(s.trips)) s.trips = [];
+    if (!Array.isArray(s.categories)) s.categories = [];
     if (!s.lists.length) {
       s.lists.push({ id: DEFAULT_LIST_ID, name: 'Handleliste', createdAt: 0, updatedAt: 0, items: [] });
     }
@@ -1617,6 +1726,7 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       menu: mergeById(mine.menu || [], theirs.menu || [], mergeMenuDays),
       savedMenus: mergeById(mine.savedMenus || [], theirs.savedMenus || [], mergeSavedMenus),
       trips: mergeById(mine.trips || [], theirs.trips || [], mergeTrips),
+      categories: mergeById(mine.categories || [], theirs.categories || [], mergeCategories),
       tombstones: mergeTombstones(mine.tombstones, theirs.tombstones)
     }));
   }
@@ -1861,11 +1971,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       menu: normalizeMenu(raw && raw.menu),
       savedMenus: normalizeSavedMenus(raw && raw.savedMenus),
       trips: normalizeTrips(raw && raw.trips),
+      categories: normalizeCategories(raw && raw.categories),
       tombstones: normalizeTombstones(raw && raw.tombstones)
     });
   }
 
-  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], savedMenus: [], trips: [], tombstones: emptyTombstones() });
+  var state = ensureAtLeastOneList({ lists: [], recipes: [], menu: [], savedMenus: [], trips: [], categories: [], tombstones: emptyTombstones() });
   var activeListId = getStoredActiveListId();
 
   function ensureActiveList () {
@@ -2474,7 +2585,23 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     var unchecked = list.items.filter(function (i) { return !i.checked; });
     var checked = list.items.filter(function (i) { return i.checked; });
 
-    if (unchecked.length) section.appendChild(buildGroup(list, unchecked));
+    /* Varene som gjenstår, gruppert i butikkens rekkefølge. Innenfor en gruppe
+     * står de i rekkefølgen de ble lagt til. Det som er kjøpt står samlet
+     * nederst – der trenger du ikke lete. */
+    var byCat = {};
+    unchecked.forEach(function (it) {
+      var c = categoryOfItem(it);
+      (byCat[c] = byCat[c] || []).push(it);
+    });
+    CATEGORIES.forEach(function (c) {
+      var items = byCat[c.key];
+      if (!items) return;
+      section.appendChild(el('h3', { class: 'cat-label', 'data-cat': c.key }, [
+        el('span', { text: c.label }),
+        el('span', { class: 'cat-count', text: String(items.length) })
+      ]));
+      section.appendChild(buildGroup(list, items));
+    });
     if (checked.length) {
       section.appendChild(el('p', { class: 'group-label', text: 'Kjøpt' }));
       section.appendChild(buildGroup(list, checked));
@@ -2512,14 +2639,69 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       qtyControl = el('span', { class: 'item-qty static', text: '× ' + item.qty });
     }
 
-    var li = el('li', { class: 'item' + (item.checked ? ' is-checked' : '') });
+    var li = el('li', { class: 'item' + (item.checked ? ' is-checked' : ''), 'data-id': item.id });
     [checkBtn, body, qtyControl].forEach(function (c) { li.appendChild(c); });
+    if (!item.checked) {
+      /* Trykk på navnet for å flytte varen til en annen gruppe. */
+      body.classList.add('is-tappable');
+      body.setAttribute('role', 'button');
+      body.setAttribute('tabindex', '0');
+      body.setAttribute('aria-label', item.name + ' – trykk for å flytte til en annen gruppe');
+      body.addEventListener('click', function () { showCategoryModal(item.name); });
+      body.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showCategoryModal(item.name); }
+      });
+    }
 
     checkBtn.addEventListener('click', function () { toggleItem(list.id, item.id); });
     var delBtn = el('button', { class: 'del-btn', 'aria-label': 'Slett ' + item.name, html: ICON_TRASH });
     delBtn.addEventListener('click', function () { deleteItem(list.id, item.id); });
     li.appendChild(delBtn);
     return li;
+  }
+
+  /* Flytt en vare til en annen gruppe. Valget gjelder varen, ikke raden:
+   * neste gang «melk» legges til, havner den samme sted – på begge telefonene. */
+  function setCategoryFor (itemName, cat) {
+    var key = categoryKeyOfName(itemName);
+    if (!key || !CATEGORY_LABEL[cat]) return;
+    var found = null;
+    state.categories.forEach(function (c) { if (c.id === key) found = c; });
+    if (found) { found.cat = cat; found.updatedAt = Date.now(); }
+    else state.categories.push({ id: key, cat: cat, updatedAt: Date.now() });
+    scheduleSave();
+  }
+
+  function showCategoryModal (itemName) {
+    closeOverlay();
+    var key = categoryKeyOfName(itemName);
+    var current = categoryOverride(key) || guessCategory(key);
+    var shown = splitItemName(itemName).base;
+    var rows = el('div', { class: 'plan-day-list' });
+    CATEGORIES.forEach(function (c) {
+      var isHere = c.key === current;
+      var row = el('button', { type: 'button', class: 'plan-day-row cat-row' + (isHere ? ' is-chosen' : ''), 'data-cat': c.key }, [
+        el('span', { class: 'plan-day-name', text: c.label }),
+        isHere ? el('span', { class: 'plan-day-meta', text: 'Står her nå' }) : null
+      ]);
+      row.addEventListener('click', function () {
+        if (!isHere) setCategoryFor(itemName, c.key);
+        closeOverlay();
+        renderListOnly();
+      });
+      rows.appendChild(row);
+    });
+    var cancelBtn = el('button', { class: 'secondary', type: 'button', text: 'Avbryt' });
+    cancelBtn.addEventListener('click', closeOverlay);
+    var modal = el('div', { class: 'modal wide plan-modal cat-modal' }, [
+      el('h2', { text: 'Flytt «' + shown + '»' }),
+      el('p', { text: 'Velg gruppe. Valget huskes for «' + shown + '» fremover, på begge telefonene.' }),
+      rows,
+      el('div', { class: 'modal-actions' }, [cancelBtn])
+    ]);
+    var overlay = el('div', { class: 'overlay', id: 'modal-overlay' }, [modal]);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    document.body.appendChild(overlay);
   }
 
   /* Sorterer og filtrerer oppskriftene slik listen skal vises. */
@@ -4751,13 +4933,13 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
     if (exact) {
       exact.qty = Math.min(999, exact.qty + qty);
       exact.updatedAt = now;
-      return;
+      return exact;
     }
     if (combine) {
       combine.name = combineParts.base + ' (' + combineAmounts(combineParts.amount, combine.qty, incoming.amount, qty) + ')';
       combine.qty = 1;
       combine.updatedAt = now;
-      return;
+      return combine;
     }
 
     var item = {
@@ -4783,17 +4965,26 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstat
       });
       item.addedAt = after === null ? lastSameBase.addedAt + 1 : (lastSameBase.addedAt + after) / 2;
       list.items.splice(list.items.indexOf(lastSameBase) + 1, 0, item);
-      return;
+      return item;
     }
     list.items.push(item);
+    return item;
   }
 
   function addItem (listId, name, qty) {
     var list = findList(listId);
     if (!list) return;
-    mergeItemIntoList(list, name, qty, getName());
+    var touched = mergeItemIntoList(list, name, qty, getName());
     renderListOnly();
     scheduleSave();
+    /* Varen havner i sin gruppe, ikke nederst. Et kort blink viser hvor. */
+    if (touched) {
+      var li = document.querySelector('li.item[data-id="' + touched.id + '"]');
+      if (li) {
+        li.classList.add('is-new');
+        setTimeout(function () { li.classList.remove('is-new'); }, 1600);
+      }
+    }
   }
 
   function toggleItem (listId, itemId) {
